@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from typing import List
 
@@ -13,7 +14,20 @@ class Settings(BaseSettings):
     NVIDIA_API_KEY: str = ""
     MISTRAL_API_KEY: str = ""
 
+    # Supabase (backend only - never expose service role key to frontend)
+    SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
+    SUPABASE_DATABASE_URL: str = ""
+
     DATABASE_URL: str = "sqlite:///./ventrix.db"
+
+    @property
+    def database_url(self) -> str:
+        url = self.SUPABASE_DATABASE_URL or self.DATABASE_URL
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql://", 1)
+        return url
 
     WORKFLOW_MAX_RETRIES: int = 2
     WORKFLOW_RETRY_BACKOFF_SECONDS: float = 0.05
@@ -21,7 +35,11 @@ class Settings(BaseSettings):
 
     MAX_ANALYSES: int = 10
 
-    CORS_ORIGINS: List[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: str = "http://localhost:3000"
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        return [item.strip() for item in self.CORS_ORIGINS.split(",") if item.strip()]
 
     class Config:
         env_file = ".env"
