@@ -24,6 +24,7 @@ from app.agents import (
 )
 from app.agents.output import ExecutionStatus
 from app.core.config import settings
+from app.llm.gateway import llm_gateway
 from app.workflows.report import generate_report_pdf
 from app.data import (
     Cache,
@@ -72,6 +73,14 @@ async def api_health():
     tags=["analyses"],
 )
 def create_analysis(payload: AnalysisCreate, db: Session = Depends(get_db)):
+    if db.query(Analysis).count() >= settings.MAX_ANALYSES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Maximum analysis limit of {settings.MAX_ANALYSES} "
+                "has been reached."
+            ),
+        )
     analysis = Analysis(
         startup_name=payload.startup_name.strip(),
         website=str(payload.website),
@@ -532,6 +541,16 @@ def system_status(db: Session = Depends(get_db)):
         "active_provider": active,
         "fallback_history": [],
         "version": "1.0.0",
+    }
+
+
+
+@api_router.get("/system/llm", tags=["system"])
+def llm_provider_status():
+    return {
+        "providers": llm_gateway.provider_status(),
+        "fallback_history": llm_gateway.fallback_history(),
+        "usage": llm_gateway.usage(),
     }
 
 

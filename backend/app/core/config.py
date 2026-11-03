@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     WORKFLOW_RETRY_BACKOFF_SECONDS: float = 0.05
     WORKFLOW_MAX_PAGES: int = 5
 
+    MAX_ANALYSES: int = 10
+
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
 
     class Config:
