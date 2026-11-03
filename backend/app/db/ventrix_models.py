@@ -12,14 +12,8 @@ from sqlalchemy import (
     UniqueConstraint,
     CheckConstraint,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import declarative_base
-from sqlalchemy.types import UUID, JSON
-
-try:
-    from sqlalchemy.dialects.postgresql import JSONB as _JSONB
-except Exception:  # pragma: no cover
-    _JSONB = JSON
+from sqlalchemy.types import UUID, JSON as JSONB
 
 VentrixBase = declarative_base()
 
@@ -150,6 +144,7 @@ class UsageLimit(VentrixBase):
     scope_id = Column(String(255), nullable=True)
     max_analyses = Column(Integer, nullable=False, default=10)
     used_analyses = Column(Integer, nullable=False, default=0)
+    reserved_count = Column(Integer, nullable=False, default=0)
     period_start = Column(DateTime(timezone=True), nullable=True)
     period_end = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=_now)

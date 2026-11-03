@@ -317,3 +317,58 @@ export function collectEvidence(
 export function getSystemStatus(): Promise<SystemStatus> {
   return apiRequest<SystemStatus>("/system/status");
 }
+
+export interface StartupSubmission {
+  name: string;
+  website: string;
+  description?: string;
+  industry?: string;
+  stage?: string;
+  location?: string;
+}
+
+export interface AnalysisStartResponse {
+  analysis_id: number;
+  status: string;
+}
+
+export interface SystemUsage {
+  max_analyses: number;
+  completed_analyses: number;
+  reserved_analyses: number;
+  remaining_analyses: number;
+  limit_reached: boolean;
+}
+
+export async function createStartup(input: StartupSubmission): Promise<Record<string, unknown>> {
+  const response = await fetch(`${API_BASE_URL}/api/startup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error("Startup creation failed");
+  return response.json();
+}
+
+export async function startAnalysis(input: AnalysisSubmission): Promise<AnalysisStartResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/analysis/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    let message = `Request failed (${response.status})`;
+    try {
+      const data = await response.json();
+      message = (data as { detail?: string }).detail ?? message;
+    } catch {}
+    throw new Error(message);
+  }
+  return response.json() as Promise<AnalysisStartResponse>;
+}
+
+export async function getSystemUsage(): Promise<SystemUsage> {
+  const response = await fetch(`${API_BASE_URL}/api/system/usage`);
+  if (!response.ok) throw new Error("Failed to load usage");
+  return response.json() as Promise<SystemUsage>;
+}

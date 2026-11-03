@@ -9,6 +9,8 @@ from app.core.logging import setup_logging
 from app.db.session import engine, init_db
 from app.schemas import HealthCheck
 from app.api import api_router
+from app.api.usage import router as usage_router
+from app.api.frontend_compat import router as frontend_router
 
 
 setup_logging()
@@ -28,6 +30,10 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(usage_router, prefix="/api")
+app.include_router(usage_router, prefix="/api/v1")
+app.include_router(frontend_router, prefix="/api")
+app.include_router(frontend_router, prefix="/api/v1")
 
 
 @app.on_event("startup")
