@@ -1,0 +1,67 @@
+# ============================================================
+# Ventrix Backend .gitignore
+# ============================================================
+
+# --- Environment / secrets ---
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# --- Python bytecode / cache ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyc
+*.pyo
+*.pyd
+
+# --- Virtual environments ---
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# --- Build / distribution ---
+build/
+dist/
+*.egg-info/
+*.dist-info/
+*.egg
+.eggs/
+
+# --- Database ---
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+ventrix.db
+
+# --- Logs ---
+*.log
+pip-log.txt
+pip-delete-this-directory.txt
+
+# --- Testing / coverage ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.mypy_cache/
+.ropeproject/
+
+# --- Editor / IDE ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db

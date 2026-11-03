@@ -1,0 +1,25 @@
+from pydantic_settings import BaseSettings
+from typing import List
+
+
+class Settings(BaseSettings):
+    APP_NAME: str = "Ventrix"
+    APP_VERSION: str = "0.1.0"
+    DEBUG: bool = False
+
+    SECRET_KEY: str = "dev-secret-change-in-production"
+
+    GEMINI_API_KEY: str = ""
+    NVIDIA_API_KEY: str = ""
+    MISTRAL_API_KEY: str = ""
+
+    DATABASE_URL: str = "sqlite:///./ventrix.db"
+
+    CORS_ORIGINS: List[str] = ["http://localhost:3000"]
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+
+
+settings = Settings()

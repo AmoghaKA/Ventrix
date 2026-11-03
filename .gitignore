@@ -1,0 +1,129 @@
+# ============================================================
+# Ventrix Root .gitignore
+# ============================================================
+
+# --- Environment / secrets ---
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+*.pem
+*.key
+
+# --- OS generated ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# --- Editor / IDE ---
+.idea/
+.vscode/
+!.vscode/
+!.vscode/settings.json
+*.swp
+*.swo
+*~
+*.proj
+*.user
+*.cache
+*.code-workspace
+
+# --- Logs ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pip-log.txt
+pip-delete-this-directory.txt
+
+# --- Python ---
+__pycache__/
+backend/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+*.egg-info/
+*.dist-info/
+*.egg
+*.pyc
+*.pyo
+*.pyd
+.installed.cfg
+*.egg-link
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+backend/venv/
+backend/.venv/
+
+# --- Node / Frontend ---
+node_modules/
+frontend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+.pnpm-store/
+.bun/
+*.tsbuildinfo
+.eslintcache
+
+# --- Next.js ---
+.next/
+frontend/.next/
+out/
+frontend/out/
+dist/
+frontend/dist/
+build/
+frontend/build/
+*.next/
+frontend/*.tsbuildinfo
+
+# --- Database / data ---
+*.db
+backend/*.db
+*.sqlite
+backend/*.sqlite
+*.sqlite3
+backend/*.sqlite3
+*.sql
+ventrix.db
+backend/ventrix.db
+
+# --- Testing / coverage ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.mypy_cache/
+.ropeproject/
+*.cover
+coverage/
+
+# --- Misc ---
+.tmp/
+.tmp.*
+*.tmp
+*.bak
+*.swp
+*.orig
