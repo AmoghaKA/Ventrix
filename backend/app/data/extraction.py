@@ -1,9 +1,11 @@
 import hashlib
+import io
+import os.path
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html.parser import HTMLParser
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 from urllib.parse import urlsplit
 
 from app.data.retrieval import RetrievedSource
@@ -112,6 +114,20 @@ class ExtractedEvidence:
     content_hash: str
 
 
+@dataclass(frozen=True)
+class ExtractionFailure:
+    """A safe, structured record explaining why a source was not evidence."""
+
+    source_url: str
+    failure_stage: str
+    error_category: str
+    description: str
+    document_name: Optional[str] = None
+
+
+ExtractionResult = Union[ExtractedEvidence, ExtractionFailure]
+
+
 class _DocumentParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -171,13 +187,223 @@ class _DocumentParser(HTMLParser):
         self.text_parts.append(data)
 
 
+def extract_source_detailed(
+    source: RetrievedSource,
+    *,
+    max_document_bytes: int = 2_000_000,
+    max_pdf_pages: int = 100,
+    max_extracted_characters: int = 200_000,
+) -> ExtractionResult:
+    """Extract a supported source or return a structured safe failure.
+
+    PDFs are size limited before parsing and page/text limited during parsing.
+    No password guessing or OCR is attempted.
+    """
+    if _is_pdf(source):
+        return _extract_pdf_source(
+            source,
+            max_document_bytes=max_document_bytes,
+            max_pdf_pages=max_pdf_pages,
+            max_extracted_characters=max_extracted_characters,
+        )
+    if len(source.content.encode("utf-8", errors="replace")) > max_document_bytes:
+        return ExtractionFailure(
+            source_url=source.final_url or source.url,
+            failure_stage="extraction",
+            error_category="document_too_large",
+            description="The document exceeds the configured extraction size limit.",
+        )
+    return _extract_html_source(source)
+
+
 def extract_source(source: RetrievedSource) -> Optional[ExtractedEvidence]:
+    """Compatibility wrapper returning evidence or ``None`` for old callers."""
+    result = extract_source_detailed(source)
+    return result if isinstance(result, ExtractedEvidence) else None
+
+
+def _is_pdf(source: RetrievedSource) -> bool:
+    content_type = (source.content_type or "").split(";", 1)[0].strip().lower()
+    if content_type == "application/pdf":
+        return True
+    try:
+        prefix = source.content.encode("latin-1")[:1024]
+    except UnicodeEncodeError:
+        return False
+    return b"%PDF-" in prefix
+
+
+def _extract_pdf_source(
+    source: RetrievedSource,
+    *,
+    max_document_bytes: int,
+    max_pdf_pages: int,
+    max_extracted_characters: int,
+) -> ExtractionResult:
+    try:
+        pdf_bytes = source.content.encode("latin-1")
+    except UnicodeEncodeError:
+        return ExtractionFailure(
+            source_url=source.final_url or source.url,
+            failure_stage="document_decode",
+            error_category="unsupported_encoding",
+            description="The PDF response could not be represented as document bytes.",
+        )
+
+    document_name = os.path.basename(urlsplit(source.final_url or source.url).path)
+    document_name = document_name or "PDF document"
+    if len(pdf_bytes) > max_document_bytes:
+        return ExtractionFailure(
+            source_url=source.final_url or source.url,
+            failure_stage="document_validation",
+            error_category="document_too_large",
+            description="The PDF exceeds the configured extraction size limit.",
+            document_name=document_name,
+        )
+    if b"%PDF-" not in pdf_bytes[:1024]:
+        return ExtractionFailure(
+            source_url=source.final_url or source.url,
+            failure_stage="document_validation",
+            error_category="malformed_pdf",
+            description="The response is labelled as a PDF but has no valid PDF header.",
+            document_name=document_name,
+        )
+
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return ExtractionFailure(
+            source_url=source.final_url or source.url,
+            failure_stage="parser_setup",
+            error_category="parser_unavailable",
+            description="The PDF parser is not installed in this environment.",
+            document_name=document_name,
+        )
+
+    try:
+        reader = PdfReader(io.BytesIO(pdf_bytes), strict=False)
+        if reader.is_encrypted:
+            return ExtractionFailure(
+                source_url=source.final_url or source.url,
+                failure_stage="document_open",
+                error_category="encrypted_pdf",
+                description="The PDF is encrypted and no password was supplied.",
+                document_name=document_name,
+            )
+        page_count = len(reader.pages)
+        if page_count > max_pdf_pages:
+            return ExtractionFailure(
+                source_url=source.final_url or source.url,
+                failure_stage="document_validation",
+                error_category="page_limit_exceeded",
+                description="The PDF exceeds the configured page processing limit.",
+                document_name=document_name,
+            )
+
+        page_texts: List[str] = []
+        page_references: List[int] = []
+        extracted_size = 0
+        for page_number, page in enumerate(reader.pages, start=1):
+            page_text = _collapse_whitespace(page.extract_text() or "")
+            if not page_text:
+                continue
+            extracted_size += len(page_text)
+            if extracted_size > max_extracted_characters:
+                return ExtractionFailure(
+                    source_url=source.final_url or source.url,
+                    failure_stage="text_extraction",
+                    error_category="text_limit_exceeded",
+                    description="The PDF text exceeds the configured extraction limit.",
+                    document_name=document_name,
+                )
+            page_texts.append(f"[Page {page_number}] {page_text}")
+            page_references.append(page_number)
+
+        if not page_texts:
+            return ExtractionFailure(
+                source_url=source.final_url or source.url,
+                failure_stage="text_extraction",
+                error_category="empty_pdf",
+                description="The PDF contains no extractable text.",
+                document_name=document_name,
+            )
+
+        metadata = reader.metadata
+        metadata_title = _collapse_whitespace(str(metadata.title or "")) if metadata else ""
+        title = metadata_title or document_name
+        raw_text = "\n".join(page_texts)
+        excerpt = _excerpt(raw_text, "")
+        if len(raw_text) < 80 or not excerpt:
+            return ExtractionFailure(
+                source_url=source.final_url or source.url,
+                failure_stage="text_validation",
+                error_category="insufficient_text",
+                description="The PDF text is too short to create usable evidence.",
+                document_name=title,
+            )
+
+        category = _categorise(source.final_url, title, "", raw_text)
+        information = _build_extracted_information(title, "", excerpt)
+        source_metadata: Dict[str, object] = {
+            "final_url": source.final_url,
+            "content_type": source.content_type,
+            "from_cache": source.from_cache,
+            "document_type": "pdf",
+            "document_name": document_name,
+            "page_count": page_count,
+            "page_references": page_references,
+            "extraction_method": "pypdf_text",
+            "word_count": len(raw_text.split()),
+        }
+        if metadata and metadata.author:
+            source_metadata["document_author"] = str(metadata.author)[:512]
+        if metadata and metadata.creation_date:
+            source_metadata["document_creation_date"] = str(metadata.creation_date)[:64]
+        if metadata and metadata.subject:
+            source_metadata["document_subject"] = str(metadata.subject)[:512]
+
+        return ExtractedEvidence(
+            url=source.final_url,
+            source_title=title[:512],
+            source_category=category,
+            extracted_information=information,
+            raw_text=raw_text[:20_000],
+            publication_date=None,
+            related_agent=_CATEGORY_AGENTS[category],
+            findings=[
+                {
+                    "type": "excerpt",
+                    "value": excerpt,
+                    "pages": ",".join(map(str, page_references)),
+                }
+            ],
+            source_metadata=source_metadata,
+            content_hash=hashlib.sha256(pdf_bytes).hexdigest(),
+        )
+    except Exception:
+        return ExtractionFailure(
+            source_url=source.final_url or source.url,
+            failure_stage="text_extraction",
+            error_category="malformed_pdf",
+            description="The PDF could not be parsed or its text could not be extracted.",
+            document_name=document_name,
+        )
+
+
+def _extract_html_source(
+    source: RetrievedSource,
+) -> Union[ExtractedEvidence, ExtractionFailure]:
     parser = _DocumentParser()
     try:
         parser.feed(source.content)
         parser.close()
     except Exception:
-        return None
+        return ExtractionFailure(
+            source_url=source.final_url or source.url,
+            failure_stage="html_parse",
+            error_category="malformed_html",
+            description="The HTML source could not be parsed into readable content.",
+        )
 
     title = (
         parser.meta.get("og:title")
@@ -197,7 +423,12 @@ def extract_source(source: RetrievedSource) -> Optional[ExtractedEvidence]:
 
     excerpt = _excerpt(raw_text, description)
     if not description and not excerpt and len(raw_text) < 120:
-        return None
+        return ExtractionFailure(
+            source_url=source.final_url or source.url,
+            failure_stage="text_validation",
+            error_category="insufficient_text",
+            description="The source contains too little readable text to create evidence.",
+        )
 
     extracted_information = _build_extracted_information(
         title,
@@ -205,7 +436,12 @@ def extract_source(source: RetrievedSource) -> Optional[ExtractedEvidence]:
         excerpt,
     )
     if not extracted_information:
-        return None
+        return ExtractionFailure(
+            source_url=source.final_url or source.url,
+            failure_stage="text_validation",
+            error_category="empty_content",
+            description="The source did not contain extractable evidence text.",
+        )
 
     source_title = title or _fallback_title(source.final_url)
     category = _categorise(source.final_url, title, description, raw_text)

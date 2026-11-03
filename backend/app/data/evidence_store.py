@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Optional
 from urllib.parse import urlsplit, urlunsplit
@@ -6,9 +6,17 @@ from urllib.parse import urlsplit, urlunsplit
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.data.extraction import extract_source
+from app.data.extraction import (
+    ExtractionFailure,
+    extract_source_detailed,
+)
 from app.data.retrieval import RetrievalReport
-from app.db.models import Analysis, Evidence, Startup
+from app.db.models import (
+    Analysis,
+    DocumentExtractionFailure,
+    Evidence,
+    Startup,
+)
 
 
 @dataclass
@@ -17,6 +25,7 @@ class StoreResult:
     stored: int = 0
     updated: int = 0
     skipped: int = 0
+    extraction_failures: List[ExtractionFailure] = field(default_factory=list)
 
 
 @dataclass
@@ -93,12 +102,50 @@ class EvidenceStore:
         result = StoreResult(total_sources=len(report.sources))
 
         for source in report.sources:
-            extracted = extract_source(source)
-            if extracted is None:
+            extraction = extract_source_detailed(source)
+            source_url = (source.final_url or source.url).strip()
+            if isinstance(extraction, ExtractionFailure):
+                result.extraction_failures.append(extraction)
                 result.skipped += 1
+                existing_failure = (
+                    self.db.query(DocumentExtractionFailure)
+                    .filter(
+                        DocumentExtractionFailure.analysis_id == analysis.id,
+                        DocumentExtractionFailure.source_url == source_url,
+                    )
+                    .one_or_none()
+                )
+                if existing_failure is None:
+                    self.db.add(
+                        DocumentExtractionFailure(
+                            startup_id=startup.id,
+                            analysis_id=analysis.id,
+                            source_url=source_url,
+                            document_name=extraction.document_name,
+                            failure_stage=extraction.failure_stage,
+                            error_category=extraction.error_category,
+                            description=extraction.description,
+                        )
+                    )
+                else:
+                    existing_failure.startup_id = startup.id
+                    existing_failure.document_name = extraction.document_name
+                    existing_failure.failure_stage = extraction.failure_stage
+                    existing_failure.error_category = extraction.error_category
+                    existing_failure.description = extraction.description
                 continue
 
-            source_url = (source.final_url or source.url).strip()
+            extracted = extraction
+            previous_failure = (
+                self.db.query(DocumentExtractionFailure)
+                .filter(
+                    DocumentExtractionFailure.analysis_id == analysis.id,
+                    DocumentExtractionFailure.source_url == source_url,
+                )
+                .one_or_none()
+            )
+            if previous_failure is not None:
+                self.db.delete(previous_failure)
             existing = (
                 self.db.query(Evidence)
                 .filter(
