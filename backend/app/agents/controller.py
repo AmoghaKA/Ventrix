@@ -707,6 +707,7 @@ class ControllerAgent:
                 state.get("specialist_errors", {}),
                 state.get("verification"),
                 state.get("aggregation"),
+                workflow_id=self.workflow_id,
             )
             workflow = self._workflow()
             workflow.report = jsonable_encoder(report)

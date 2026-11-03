@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -14,11 +17,8 @@ import { AnalysisTable } from "@/components/dashboard/analysis-table";
 import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  demoActivity,
-  demoAnalyses,
-  type DemoAssessment,
-} from "@/lib/demo-data";
+import { listAnalyses, type AnalysisRecord } from "@/lib/api";
+import { demoActivity, demoAnalyses, type DemoAssessment } from "@/lib/demo-data";
 
 const assessmentVariant: Record<
   DemoAssessment,
@@ -37,17 +37,30 @@ const activityIcon = {
 };
 
 export default function DashboardPage() {
-  const total = demoAnalyses.length;
-  const completed = demoAnalyses.filter(
-    (analysis) => analysis.status === "Completed"
-  ).length;
+  const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    listAnalyses()
+      .then(setAnalyses)
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : "Failed to load analyses")
+      )
+      .finally(() => setLoading(false));
+  }, []);
+
+  const total = analyses.length || demoAnalyses.length;
+  const completed = analyses.length
+    ? analyses.filter((analysis) => analysis.status === "completed").length
+    : demoAnalyses.filter((analysis) => analysis.status === "Completed").length;
   const pending = total - completed;
 
   const stats = [
     {
       label: "Total analyses",
       value: total,
-      detail: "All demo records",
+      detail: analyses.length ? "Backend records" : "Demo preview",
       icon: BarChart3,
     },
     {
@@ -63,6 +76,8 @@ export default function DashboardPage() {
       icon: Clock,
     },
   ];
+
+  const recent = analyses.length ? analyses.slice(0, 4) : null;
 
   return (
     <div className="space-y-6">
@@ -88,19 +103,14 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      <div className="flex items-start gap-3 rounded-sm border border-warning/30 bg-warning/5 px-4 py-3">
-        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-warning">
-            Demo preview data
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-text-secondary">
-            All counts, startup names, assessments, and activity on this page
-            are sample data for UI preview. No real company statistics are
-            shown.
-          </p>
+      {error && (
+        <div className="flex items-start gap-3 rounded-sm border border-warning/30 bg-warning/5 px-4 py-3">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+          <p className="text-xs text-text-secondary">{error}</p>
         </div>
-      </div>
+      )}
+
+      {loading && <p className="text-sm text-text-secondary">Loading dashboard...</p>}
 
       <div className="grid gap-4 sm:grid-cols-3">
         {stats.map((stat) => {
@@ -128,123 +138,75 @@ export default function DashboardPage() {
         })}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.55fr_1fr]">
-        <Card padding="none" className="overflow-hidden">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-text-primary">
-                  Recent startup evaluations
-                </h2>
-                <Badge variant="warning">Demo data</Badge>
-              </div>
-              <p className="mt-1 text-xs text-text-secondary">
-                Latest preview records across the pipeline
-              </p>
-            </div>
-            <Link
-              href="/dashboard/analysis-history"
-              className="hidden items-center gap-1 text-xs font-medium text-blue-accent hover:underline sm:inline-flex"
-            >
-              View all
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
+      <Card padding="none" className="overflow-hidden">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div>
+            <h2 className="text-sm font-semibold text-text-primary">
+              Recent startup evaluations
+            </h2>
+            <p className="mt-1 text-xs text-text-secondary">
+              {analyses.length ? "Backend records" : "Demo preview records"}
+            </p>
           </div>
+          <Link
+            href="/dashboard/analysis-history"
+            className="hidden items-center gap-1 text-xs font-medium text-blue-accent hover:underline sm:inline-flex"
+          >
+            View all
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
 
-          <div className="divide-y divide-border">
-            {demoAnalyses.slice(0, 4).map((analysis) => (
-              <Link
-                key={analysis.id}
-                href={`/dashboard/analyses/${analysis.id}`}
-                className="flex items-center justify-between gap-4 px-5 py-4 transition-colors duration-200 hover:bg-secondary/30"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm bg-blue-50 text-sm font-bold text-blue-accent">
-                    {analysis.name.charAt(0)}
+        <div className="divide-y divide-border">
+          {(recent
+            ? recent.map((analysis) => (
+                <Link
+                  key={analysis.id}
+                  href={`/dashboard/analyses/${analysis.id}`}
+                  className="flex items-center justify-between gap-4 px-5 py-4 transition-colors duration-200 hover:bg-secondary/30"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm bg-blue-50 text-sm font-bold text-blue-accent">
+                      {analysis.startup_name.charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-text-primary">
+                        {analysis.startup_name}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-text-secondary">
+                        {analysis.industry || "Unknown industry"} · {analysis.status}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-text-primary">
-                      {analysis.name}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-text-secondary">
-                      {analysis.industry} · {analysis.date}
-                    </p>
+                  <ArrowRight className="h-4 w-4 text-text-secondary" />
+                </Link>
+              ))
+            : demoAnalyses.slice(0, 4).map((analysis) => (
+                <Link
+                  key={analysis.id}
+                  href={`/dashboard/analyses/${analysis.id}`}
+                  className="flex items-center justify-between gap-4 px-5 py-4 transition-colors duration-200 hover:bg-secondary/30"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm bg-blue-50 text-sm font-bold text-blue-accent">
+                      {analysis.name.charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-text-primary">
+                        {analysis.name}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-text-secondary">
+                        {analysis.industry} · {analysis.date}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
                   <Badge variant={assessmentVariant[analysis.assessment]}>
                     {analysis.assessment}
                   </Badge>
-                  <ArrowRight className="h-4 w-4 text-text-secondary" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </Card>
-
-        <div className="space-y-6">
-          <div className="rounded-sm border border-blue-200 bg-blue-50/70 p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-accent">
-                  Quick action
-                </p>
-                <h2 className="mt-2 text-base font-semibold text-text-primary">
-                  New Due Diligence
-                </h2>
-                <p className="mt-1 text-xs leading-relaxed text-text-secondary">
-                  Submit a company website and start a new analysis record.
-                </p>
-              </div>
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm bg-white text-blue-accent">
-                <PlusCircle className="h-4 w-4" />
-              </span>
-            </div>
-            <Link
-              href="/dashboard/new"
-              className={buttonStyles({
-                size: "sm",
-                className: "mt-4 w-full",
-              })}
-            >
-              Start Due Diligence
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-
-          <Card className="p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-text-primary">
-                Recent activity
-              </h2>
-              <Badge variant="warning">Demo data</Badge>
-            </div>
-            <ol className="mt-4 space-y-4">
-              {demoActivity.map((activity) => {
-                const Icon = activityIcon[activity.kind];
-                return (
-                  <li key={activity.id} className="flex gap-3">
-                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-sm bg-secondary text-text-secondary">
-                      <Icon className="h-3.5 w-3.5" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium leading-relaxed text-text-primary">
-                        {activity.title}
-                      </p>
-                      <p className="mt-0.5 text-[11px] leading-relaxed text-text-secondary">
-                        {activity.detail}
-                      </p>
-                      <p className="mt-1 text-[10px] uppercase tracking-wider text-text-secondary/80">
-                        {activity.time}
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          </Card>
+                </Link>
+              )))}
         </div>
-      </div>
+      </Card>
 
       <AnalysisTable />
     </div>

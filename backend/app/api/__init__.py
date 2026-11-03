@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from fastapi import (
+    Response,
     APIRouter,
     BackgroundTasks,
     Depends,
@@ -23,6 +24,7 @@ from app.agents import (
 )
 from app.agents.output import ExecutionStatus
 from app.core.config import settings
+from app.workflows.report import generate_report_pdf
 from app.data import (
     Cache,
     EvidenceStore,
@@ -419,6 +421,118 @@ def get_latest_verification(
             detail=str(exc),
         ) from exc
 
+
+
+@api_router.get(
+    "/analyses/{analysis_id}/report",
+    tags=["reports"],
+)
+def get_analysis_report(
+    analysis_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+):
+    try:
+        workflow = require_latest_workflow(db, analysis_id)
+    except WorkflowNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    if not workflow.report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No report is available for this analysis.",
+        )
+    return workflow.report
+
+
+@api_router.get(
+    "/analyses/{analysis_id}/report/pdf",
+    tags=["reports"],
+)
+def download_analysis_report_pdf(
+    analysis_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+):
+    try:
+        workflow = require_latest_workflow(db, analysis_id)
+    except WorkflowNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    if not workflow.report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No report is available for this analysis.",
+        )
+
+    analysis = db.get(Analysis, analysis_id)
+    pdf_bytes = generate_report_pdf(workflow.report, analysis=analysis)
+    filename = f"ventrix-report-analysis-{analysis_id}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        },
+    )
+
+
+@api_router.get(
+    "/analyses/{analysis_id}/report/download",
+    tags=["reports"],
+    include_in_schema=False,
+)
+def download_analysis_report_pdf_alias(
+    analysis_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+):
+    return download_analysis_report_pdf(analysis_id, db)
+
+
+
+
+@api_router.get("/system/status", tags=["system"])
+def system_status(db: Session = Depends(get_db)):
+    from app.core.config import settings
+
+    analysis_count = db.query(Analysis).count()
+    providers = []
+    for name, env_name in (
+        ("Gemini", "GEMINI_API_KEY"),
+        ("NVIDIA Nemotron", "NVIDIA_API_KEY"),
+        ("Mistral", "MISTRAL_API_KEY"),
+    ):
+        import os
+
+        configured = bool(os.getenv(env_name))
+        providers.append(
+            {
+                "name": name,
+                "configured": configured,
+                "active": False,
+            }
+        )
+    active = "Not configured"
+    for provider in providers:
+        if provider["configured"]:
+            active = provider["name"]
+            provider["active"] = True
+            break
+
+    return {
+        "api_status": "healthy",
+        "database": "connected",
+        "analysis_count": analysis_count,
+        "max_analyses": 10,
+        "providers": providers,
+        "active_provider": active,
+        "fallback_history": [],
+        "version": "1.0.0",
+    }
 
 
 @api_router.get(

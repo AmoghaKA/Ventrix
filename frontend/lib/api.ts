@@ -92,3 +92,228 @@ export function getAnalysis(
 export function listAnalyses(): Promise<AnalysisRecord[]> {
   return apiRequest<AnalysisRecord[]>("/analyses");
 }
+
+
+export interface WorkflowStatusRecord {
+  id: number;
+  analysis_id: number;
+  startup_id: number | null;
+  status: string;
+  current_step: string | null;
+  retry_limit: number;
+  error_details: string | null;
+  report: Record<string, unknown> | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface WorkflowAgentStatusRecord {
+  id: number;
+  workflow_id: number;
+  analysis_id: number;
+  agent_key: string;
+  agent_name: string;
+  sequence: number;
+  status: string;
+  attempt_count: number;
+  output: Record<string, unknown> | null;
+  error_details: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface WorkflowLogRecord {
+  id: number;
+  workflow_id: number;
+  analysis_id: number;
+  timestamp: string;
+  level: string;
+  event: string;
+  agent_key: string | null;
+  message: string;
+  meta: Record<string, unknown>;
+}
+
+export interface AgentInfo {
+  key: string;
+  name: string;
+  description: string;
+}
+
+export interface AgentRunResponse {
+  analysis_id: number;
+  startup_id: number;
+  outputs: Array<Record<string, unknown>>;
+}
+
+export interface EvidenceRecord {
+  id: number;
+  startup_id: number;
+  analysis_id: number;
+  source_url: string;
+  source_title: string;
+  source_category: string;
+  extracted_information: string;
+  raw_text: string | null;
+  publication_date: string | null;
+  retrieval_date: string;
+  verification_status: string;
+  related_agent: string;
+  findings: Array<Record<string, unknown>>;
+  source_metadata: Record<string, unknown>;
+  content_hash: string;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface EvidenceSearchResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  items: EvidenceRecord[];
+}
+
+export interface SystemStatus {
+  api_status: string;
+  database: string;
+  analysis_count: number;
+  max_analyses: number;
+  providers: Array<{ name: string; configured: boolean; active: boolean }>;
+  active_provider: string;
+  fallback_history: string[];
+  version: string;
+}
+
+export function listAgents(): Promise<AgentInfo[]> {
+  return apiRequest<AgentInfo[]>("/agents");
+}
+
+export function startAnalysisWorkflow(
+  analysisId: string | number,
+  retryLimit = 2,
+  maxPages = 5
+): Promise<WorkflowStatusRecord> {
+  return apiRequest<WorkflowStatusRecord>(
+    `/analyses/${analysisId}/start?retry_limit=${retryLimit}&max_pages=${maxPages}`,
+    { method: "POST" }
+  );
+}
+
+export function getWorkflow(
+  analysisId: string | number
+): Promise<WorkflowStatusRecord> {
+  return apiRequest<WorkflowStatusRecord>(`/analyses/${analysisId}/workflow`);
+}
+
+export function getWorkflowAgents(
+  analysisId: string | number
+): Promise<WorkflowAgentStatusRecord[]> {
+  return apiRequest<WorkflowAgentStatusRecord[]>(
+    `/analyses/${analysisId}/workflow/agents`
+  );
+}
+
+export function getWorkflowLogs(
+  analysisId: string | number,
+  limit = 100,
+  offset = 0
+): Promise<WorkflowLogRecord[]> {
+  return apiRequest<WorkflowLogRecord[]>(
+    `/analyses/${analysisId}/workflow/logs?limit=${limit}&offset=${offset}`
+  );
+}
+
+export function runAgent(
+  analysisId: string | number,
+  agentKey: string
+): Promise<Record<string, unknown>> {
+  return apiRequest<Record<string, unknown>>(
+    `/analyses/${analysisId}/agents/${agentKey}/run`,
+    { method: "POST" }
+  );
+}
+
+export function runAgents(
+  analysisId: string | number,
+  agents?: string[]
+): Promise<AgentRunResponse> {
+  const query = agents?.length
+    ? `?${agents.map((agent) => `agents=${encodeURIComponent(agent)}`).join("&")}`
+    : "";
+  return apiRequest<AgentRunResponse>(`/analyses/${analysisId}/agents/run${query}`, {
+    method: "POST",
+  });
+}
+
+export function verifyAnalysis(
+  analysisId: string | number
+): Promise<Record<string, unknown>> {
+  return apiRequest<Record<string, unknown>>(`/analyses/${analysisId}/verify`, {
+    method: "POST",
+  });
+}
+
+export function getVerification(
+  analysisId: string | number
+): Promise<Record<string, unknown>> {
+  return apiRequest<Record<string, unknown>>(`/analyses/${analysisId}/verification`);
+}
+
+export function getReport(
+  analysisId: string | number
+): Promise<Record<string, unknown>> {
+  return apiRequest<Record<string, unknown>>(`/analyses/${analysisId}/report`);
+}
+
+export async function downloadReportPdf(
+  analysisId: string | number
+): Promise<Blob> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/analyses/${analysisId}/report/pdf`
+  );
+  if (!response.ok) throw new Error("Report download failed");
+  return response.blob();
+}
+
+export function searchEvidence(params: {
+  analysisId?: string | number;
+  query?: string;
+  category?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<EvidenceSearchResponse> {
+  const search = new URLSearchParams();
+  if (params.analysisId !== undefined)
+    search.set("analysis_id", String(params.analysisId));
+  if (params.query) search.set("q", params.query);
+  if (params.category) search.set("category", params.category);
+  if (params.status) search.set("verification_status", params.status);
+  if (params.limit !== undefined) search.set("limit", String(params.limit));
+  if (params.offset !== undefined) search.set("offset", String(params.offset));
+  return apiRequest<EvidenceSearchResponse>(`/evidence?${search.toString()}`);
+}
+
+export function getEvidence(
+  evidenceId: string | number
+): Promise<EvidenceRecord> {
+  return apiRequest<EvidenceRecord>(`/evidence/${evidenceId}`);
+}
+
+export function collectEvidence(
+  analysisId: string | number,
+  maxPages = 5
+): Promise<Record<string, unknown>> {
+  return apiRequest<Record<string, unknown>>(
+    `/analyses/${analysisId}/collect-evidence?max_pages=${maxPages}`,
+    { method: "POST" }
+  );
+}
+
+export function getSystemStatus(): Promise<SystemStatus> {
+  return apiRequest<SystemStatus>("/system/status");
+}

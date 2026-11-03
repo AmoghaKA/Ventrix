@@ -146,10 +146,16 @@ The Verification Agent cross-checks specialist findings against stored evidence.
 
 Verification statuses are `VERIFIED`, `PARTIALLY_VERIFIED`, `UNVERIFIED`, `CONTRADICTED`, and `UNAVAILABLE`. The agent does not treat specialist output as verified unless the stored evidence supports it.
 
+## Investor Report
+
+Starting an analysis generates a comprehensive investor-facing due diligence report with 12 sections: executive summary, company profile, investment opportunity, financial due diligence, market analysis, legal analysis, risk assessment, verification, information gaps, investor questions, investment considerations, and final assessment.
+
+Reports include findings, evidence references, tables, risk indicators, charts based on available numerical data, and a final assessment category. No arbitrary numerical investment score is generated. Reports can be retrieved as JSON or downloaded as PDF.
+
 ## Notes
 
 - API keys are backend-only and never exposed to the frontend.
 - Financial, marketing, and legal agents are implemented with structured, evidence-backed output.
-- The Controller Agent, LangGraph workflow, Verification Agent, persisted statuses/logs/checkpoints, and deterministic final report are implemented.
+- The Controller Agent, LangGraph workflow, Verification Agent, comprehensive investor report, PDF export, persisted statuses/logs/checkpoints, and deterministic final report are implemented.
 - LLM provider integration is not yet implemented; the current workflow uses the existing retrieval and evidence-backed agent pipeline.
 - SQLite database is created automatically on startup.
