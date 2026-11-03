@@ -114,3 +114,126 @@ class RetrievalCacheEntry(Base):
     extra = Column(JSON, nullable=False, default=dict)
     fetched_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     expires_at = Column(DateTime, nullable=False, index=True)
+
+
+class DueDiligenceWorkflow(Base):
+    __tablename__ = "due_diligence_workflows"
+
+    id = Column(Integer, primary_key=True, index=True)
+    analysis_id = Column(
+        Integer,
+        ForeignKey("analyses.id"),
+        nullable=False,
+        index=True,
+    )
+    startup_id = Column(
+        Integer,
+        ForeignKey("startups.id"),
+        nullable=True,
+        index=True,
+    )
+    status = Column(
+        String(32),
+        nullable=False,
+        default="PENDING",
+        index=True,
+    )
+    current_step = Column(String(64), nullable=True)
+    retry_limit = Column(Integer, nullable=False, default=2)
+    error_details = Column(Text, nullable=True)
+    state = Column(JSON, nullable=False, default=dict)
+    report = Column(JSON, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+
+class WorkflowAgentStatus(Base):
+    __tablename__ = "workflow_agent_statuses"
+    __table_args__ = (
+        UniqueConstraint(
+            "workflow_id",
+            "agent_key",
+            name="uq_workflow_agent_status",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    workflow_id = Column(
+        Integer,
+        ForeignKey("due_diligence_workflows.id"),
+        nullable=False,
+        index=True,
+    )
+    analysis_id = Column(
+        Integer,
+        ForeignKey("analyses.id"),
+        nullable=False,
+        index=True,
+    )
+    agent_key = Column(String(64), nullable=False, index=True)
+    agent_name = Column(String(128), nullable=False)
+    sequence = Column(Integer, nullable=False, default=0)
+    status = Column(
+        String(32),
+        nullable=False,
+        default="PENDING",
+        index=True,
+    )
+    attempt_count = Column(Integer, nullable=False, default=0)
+    output = Column(JSON, nullable=True)
+    error_details = Column(Text, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+
+class WorkflowActivityLog(Base):
+    __tablename__ = "workflow_activity_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    workflow_id = Column(
+        Integer,
+        ForeignKey("due_diligence_workflows.id"),
+        nullable=False,
+        index=True,
+    )
+    analysis_id = Column(
+        Integer,
+        ForeignKey("analyses.id"),
+        nullable=False,
+        index=True,
+    )
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    level = Column(String(16), nullable=False, default="INFO")
+    event = Column(String(64), nullable=False)
+    agent_key = Column(String(64), nullable=True, index=True)
+    message = Column(Text, nullable=False)
+    meta = Column(JSON, nullable=False, default=dict)
+
+
+class WorkflowCheckpoint(Base):
+    __tablename__ = "workflow_checkpoints"
+
+    id = Column(Integer, primary_key=True, index=True)
+    workflow_id = Column(
+        Integer,
+        ForeignKey("due_diligence_workflows.id"),
+        nullable=False,
+        index=True,
+    )
+    step = Column(String(64), nullable=False)
+    state = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

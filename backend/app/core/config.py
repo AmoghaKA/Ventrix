@@ -15,6 +15,10 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = "sqlite:///./ventrix.db"
 
+    WORKFLOW_MAX_RETRIES: int = 2
+    WORKFLOW_RETRY_BACKOFF_SECONDS: float = 0.05
+    WORKFLOW_MAX_PAGES: int = 5
+
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
 
     class Config:

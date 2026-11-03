@@ -108,9 +108,40 @@ The frontend will be available at `http://localhost:3000`.
 |--------|----------|-------------|
 | GET | `/health` | Health check |
 | GET | `/api/v1/health` | API health check |
+| POST | `/api/v1/analyses` | Create an analysis |
+| GET | `/api/v1/analyses` | List analyses |
+| GET | `/api/v1/analyses/{analysis_id}` | Get an analysis |
+| POST | `/api/v1/analyses/{analysis_id}/collect-evidence` | Retrieve and store public evidence |
+| GET | `/api/v1/evidence` | Search stored evidence |
+| GET | `/api/v1/evidence/{evidence_id}` | Get a stored evidence record |
+| GET | `/api/v1/agents` | List available specialist agents |
+| POST | `/api/v1/analyses/{analysis_id}/agents/{agent_key}/run` | Run one agent |
+| POST | `/api/v1/analyses/{analysis_id}/agents/run` | Run all or selected agents |
+| POST | `/api/v1/analyses/{analysis_id}/start` | Start the due diligence workflow |
+| GET | `/api/v1/analyses/{analysis_id}/workflow` | Get the latest workflow status and report |
+| GET | `/api/v1/analyses/{analysis_id}/workflow/agents` | Get per-agent workflow statuses |
+| GET | `/api/v1/analyses/{analysis_id}/workflow/logs` | Get workflow activity logs |
+
+Agent keys are `financial`, `marketing`, and `legal`. The batch endpoint accepts repeated `agents` query parameters to select a subset.
+
+Workflow aliases are also available at `/api/v1/analyses/{analysis_id}/workflow/start` and `/api/v1/analyses/{analysis_id}/workflow/status`.
+
+## Due Diligence Workflow
+
+Starting an analysis runs the LangGraph workflow:
+
+1. Data retrieval
+2. Controller Agent
+3. Financial, Marketing, and Legal agents in parallel
+4. Verification Agent
+5. Final report
+
+Workflow and agent statuses use `PENDING`, `RUNNING`, `COMPLETED`, and `FAILED`. Specialist failures are retried up to the configured workflow retry limit. If all specialists fail, the workflow fails; partial failures are retained in the final report. Existing evidence is reused instead of performing another retrieval.
 
 ## Notes
 
 - API keys are backend-only and never exposed to the frontend.
-- Agents and workflows are scaffolded but not yet implemented.
+- Financial, marketing, and legal agents are implemented with structured, evidence-backed output.
+- The Controller Agent, LangGraph workflow, verification, persisted statuses/logs/checkpoints, and deterministic final report are implemented.
+- LLM provider integration is not yet implemented; the current workflow uses the existing retrieval and evidence-backed agent pipeline.
 - SQLite database is created automatically on startup.

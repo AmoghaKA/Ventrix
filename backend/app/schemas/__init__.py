@@ -2,6 +2,8 @@ from pydantic import BaseModel, Field, HttpUrl
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
+from app.agents.output import AgentOutput
+
 
 class StartupBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
@@ -79,6 +81,71 @@ class EvidenceCollectionOut(BaseModel):
     updated_evidence: int
     skipped_sources: int
     errors: List[str] = []
+
+
+class AgentInfoOut(BaseModel):
+    key: str
+    name: str
+    description: str
+
+
+class AgentRunOut(BaseModel):
+    analysis_id: int
+    startup_id: int
+    outputs: List[AgentOutput]
+
+
+class WorkflowOut(BaseModel):
+    id: int
+    analysis_id: int
+    startup_id: Optional[int] = None
+    status: str
+    current_step: Optional[str] = None
+    retry_limit: int
+    error_details: Optional[str] = None
+    report: Optional[Dict[str, Any]] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class WorkflowAgentStatusOut(BaseModel):
+    id: int
+    workflow_id: int
+    analysis_id: int
+    agent_key: str
+    agent_name: str
+    sequence: int
+    status: str
+    attempt_count: int
+    output: Optional[Dict[str, Any]] = None
+    error_details: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class WorkflowActivityLogOut(BaseModel):
+    id: int
+    workflow_id: int
+    analysis_id: int
+    timestamp: datetime
+    level: str
+    event: str
+    agent_key: Optional[str] = None
+    message: str
+    meta: Dict[str, Any] = {}
+
+    class Config:
+        from_attributes = True
 
 
 class AgentOutputBase(BaseModel):
