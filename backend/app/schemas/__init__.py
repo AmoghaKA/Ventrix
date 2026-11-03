@@ -217,3 +217,5 @@ class HealthCheck(BaseModel):
     status: str
     version: str
     database: str
+
+from app.agents.verification import VerificationOutput as VerificationOut

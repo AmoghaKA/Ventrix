@@ -24,10 +24,14 @@ from app.agents.output import (
     RiskLevel,
 )
 from app.agents.verification import (
+    SourceReliabilityAssessment,
     VerificationAgent,
+    VerificationClaimReview,
+    VerificationContradiction,
     VerificationFinding,
     VerificationFindingStatus,
     VerificationOutput,
+    VerificationStatus,
 )
 
 __all__ = [
@@ -51,10 +55,14 @@ __all__ = [
     "LegalAgent",
     "MarketingAgent",
     "RiskLevel",
+    "SourceReliabilityAssessment",
     "VerificationAgent",
+    "VerificationClaimReview",
+    "VerificationContradiction",
     "VerificationFinding",
     "VerificationFindingStatus",
     "VerificationOutput",
+    "VerificationStatus",
     "available_agents",
     "resolve_agent",
 ]

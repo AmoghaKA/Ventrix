@@ -17,8 +17,11 @@ from app.agents import (
     AgentOutput,
     AnalysisNotFoundError,
     InvalidAnalysisError,
+    VerificationAgent,
+    VerificationOutput,
     available_agents,
 )
+from app.agents.output import ExecutionStatus
 from app.core.config import settings
 from app.data import (
     Cache,
@@ -283,6 +286,139 @@ def get_workflow_activity_logs(
         .limit(limit)
         .all()
     )
+
+
+async def _verify_analysis(
+    db: Session,
+    analysis_id: int,
+) -> VerificationOutput:
+    analysis = db.get(Analysis, analysis_id)
+    if analysis is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Analysis {analysis_id} was not found.",
+        )
+
+    startup = None
+    try:
+        startup = EvidenceStore(db).ensure_startup(
+            analysis.startup_name,
+            analysis.website,
+            industry=analysis.industry,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    orchestrator = AgentOrchestrator(db)
+    result = await orchestrator.run(
+        analysis.id,
+        ["financial", "marketing", "legal"],
+    )
+
+    name_to_key = {
+        "Financial Agent": "financial",
+        "Marketing Agent": "marketing",
+        "Legal Agent": "legal",
+    }
+    outputs_by_key: Dict[str, AgentOutput] = {}
+    specialist_errors: Dict[str, str] = {}
+    for output in result.outputs:
+        key = name_to_key.get(output.agent_name)
+        if key is None:
+            continue
+        outputs_by_key[key] = output
+        if (
+            output.execution_status == ExecutionStatus.FAILED
+            or output.error_details
+        ):
+            specialist_errors[key] = (
+                output.error_details or "Agent execution failed."
+            )
+
+    agent = VerificationAgent(db)
+    return await agent.execute(
+        startup.id,
+        {
+            "analysis_id": analysis.id,
+            "specialist_outputs": outputs_by_key,
+            "specialist_errors": specialist_errors,
+        },
+    )
+
+
+@api_router.post(
+    "/analyses/{analysis_id}/verify",
+    response_model=VerificationOutput,
+    tags=["verification"],
+)
+async def verify_analysis(
+    analysis_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+):
+    return await _verify_analysis(db, analysis_id)
+
+
+@api_router.post(
+    "/analyses/{analysis_id}/verification/run",
+    response_model=VerificationOutput,
+    tags=["verification"],
+    include_in_schema=False,
+)
+async def verify_analysis_run_alias(
+    analysis_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+):
+    return await _verify_analysis(db, analysis_id)
+
+
+@api_router.post(
+    "/analyses/{analysis_id}/agents/verification/run",
+    response_model=VerificationOutput,
+    tags=["verification"],
+    include_in_schema=False,
+)
+async def verify_analysis_agent_alias(
+    analysis_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+):
+    return await _verify_analysis(db, analysis_id)
+
+
+@api_router.get(
+    "/analyses/{analysis_id}/verification",
+    response_model=VerificationOutput,
+    tags=["verification"],
+)
+def get_latest_verification(
+    analysis_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+):
+    try:
+        workflow = require_latest_workflow(db, analysis_id)
+    except WorkflowNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    state = workflow.state or {}
+    verification = state.get("verification")
+    if not verification:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No verification output is available for this analysis.",
+        )
+    try:
+        return VerificationOutput.model_validate(verification)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc
+
 
 
 @api_router.get(

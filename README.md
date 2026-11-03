@@ -121,6 +121,8 @@ The frontend will be available at `http://localhost:3000`.
 | GET | `/api/v1/analyses/{analysis_id}/workflow` | Get the latest workflow status and report |
 | GET | `/api/v1/analyses/{analysis_id}/workflow/agents` | Get per-agent workflow statuses |
 | GET | `/api/v1/analyses/{analysis_id}/workflow/logs` | Get workflow activity logs |
+| POST | `/api/v1/analyses/{analysis_id}/verify` | Run the Verification Agent |
+| GET | `/api/v1/analyses/{analysis_id}/verification` | Get the latest verification report |
 
 Agent keys are `financial`, `marketing`, and `legal`. The batch endpoint accepts repeated `agents` query parameters to select a subset.
 
@@ -138,10 +140,16 @@ Starting an analysis runs the LangGraph workflow:
 
 Workflow and agent statuses use `PENDING`, `RUNNING`, `COMPLETED`, and `FAILED`. Specialist failures are retried up to the configured workflow retry limit. If all specialists fail, the workflow fails; partial failures are retained in the final report. Existing evidence is reused instead of performing another retrieval.
 
+## Verification Agent
+
+The Verification Agent cross-checks specialist findings against stored evidence. It reviews each claim, identifies supporting and unsupported claims, detects contradictions, assesses source reliability, records missing evidence, and returns a structured report.
+
+Verification statuses are `VERIFIED`, `PARTIALLY_VERIFIED`, `UNVERIFIED`, `CONTRADICTED`, and `UNAVAILABLE`. The agent does not treat specialist output as verified unless the stored evidence supports it.
+
 ## Notes
 
 - API keys are backend-only and never exposed to the frontend.
 - Financial, marketing, and legal agents are implemented with structured, evidence-backed output.
-- The Controller Agent, LangGraph workflow, verification, persisted statuses/logs/checkpoints, and deterministic final report are implemented.
+- The Controller Agent, LangGraph workflow, Verification Agent, persisted statuses/logs/checkpoints, and deterministic final report are implemented.
 - LLM provider integration is not yet implemented; the current workflow uses the existing retrieval and evidence-backed agent pipeline.
 - SQLite database is created automatically on startup.
