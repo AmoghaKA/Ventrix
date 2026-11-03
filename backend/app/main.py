@@ -2,11 +2,15 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from sqlalchemy import text
+
 from app.core.config import settings
 from app.core.logging import setup_logging
-from app.db.session import init_db
+from app.db.session import engine, init_db
 from app.schemas import HealthCheck
 from app.api import api_router
+from app.api.usage import router as usage_router
+from app.api.frontend_compat import router as frontend_router
 
 
 setup_logging()
@@ -19,13 +23,17 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(usage_router, prefix="/api")
+app.include_router(usage_router, prefix="/api/v1")
+app.include_router(frontend_router, prefix="/api")
+app.include_router(frontend_router, prefix="/api/v1")
 
 
 @app.on_event("startup")
@@ -35,11 +43,19 @@ async def on_startup():
 
 @app.get("/health", response_model=HealthCheck, tags=["health"])
 async def health_check():
+    database = "supabase" if settings.SUPABASE_DATABASE_URL else "sqlite"
     return HealthCheck(
         status="healthy",
         version=settings.APP_VERSION,
-        database="sqlite",
+        database=database,
     )
+
+
+@app.get("/db-test", tags=["health"])
+async def db_test():
+    with engine.connect() as connection:
+        result = connection.execute(text("SELECT 1")).scalar()
+    return {"database": "connected", "result": result}
 
 
 @app.exception_handler(Exception)

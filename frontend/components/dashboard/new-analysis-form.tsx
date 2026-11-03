@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { createAnalysis } from "@/lib/api";
+import { startAnalysis } from "@/lib/api";
 
 interface FormValues {
   startupName: string;
@@ -100,7 +100,7 @@ export function NewAnalysisForm() {
     setIsSubmitting(true);
 
     try {
-      const analysis = await createAnalysis({
+      const result = await startAnalysis({
         startup_name: values.startupName.trim(),
         website: normalizeWebsite(values.website),
         country: values.country.trim() || undefined,
@@ -108,13 +108,14 @@ export function NewAnalysisForm() {
         additional_information: values.additionalInformation.trim() || undefined,
       });
 
-      if (!analysis?.id) {
-        throw new Error("The analysis was created without an ID.");
+      if (!result?.analysis_id) {
+        throw new Error("The analysis was started without an ID.");
       }
 
       setSubmitted(true);
+      setValues((current) => ({ ...current }));
       window.setTimeout(() => {
-        router.push(`/dashboard/analyses/${analysis.id}`);
+        router.push(`/dashboard/analyses/${result.analysis_id}`);
       }, 700);
     } catch (error) {
       const message =
@@ -150,7 +151,7 @@ export function NewAnalysisForm() {
               Analysis submitted successfully
             </p>
             <p className="mt-1 text-xs leading-relaxed text-text-secondary">
-              Opening the analysis monitoring page…
+              Analysis ID created. Opening the monitoring page...
             </p>
           </div>
         </div>

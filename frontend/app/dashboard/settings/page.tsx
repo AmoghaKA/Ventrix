@@ -3,16 +3,20 @@
 import { useEffect, useState } from "react";
 import { Settings } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { getSystemStatus, type SystemStatus } from "@/lib/api";
+import { getSystemStatus, getSystemUsage, type SystemStatus, type SystemUsage } from "@/lib/api";
 
 export default function SettingsPage() {
   const [status, setStatus] = useState<SystemStatus | null>(null);
+  const [usage, setUsage] = useState<SystemUsage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getSystemStatus()
-      .then(setStatus)
+    Promise.all([getSystemStatus(), getSystemUsage()])
+      .then(([statusData, usageData]) => {
+        setStatus(statusData);
+        setUsage(usageData);
+      })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load system status"))
       .finally(() => setLoading(false));
   }, []);
@@ -49,7 +53,9 @@ export default function SettingsPage() {
         {status && (
           <div className="mt-3">
             <p className="text-sm text-text-secondary">
-              {status.analysis_count} of {status.max_analyses} analyses used
+              {usage
+                ? `${usage.completed_analyses} of ${usage.max_analyses} successful runs used (${usage.remaining_analyses} remaining)`
+                : `${status.analysis_count} of ${status.max_analyses} analyses used`}
             </p>
             <div className="mt-2 h-2 w-full rounded-full bg-secondary">
               <div
