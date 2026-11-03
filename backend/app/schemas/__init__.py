@@ -36,11 +36,19 @@ class StartupOut(StartupBase):
 
 class EvidenceBase(BaseModel):
     startup_id: int
-    source: str
-    source_url: Optional[HttpUrl] = None
-    title: Optional[str] = None
-    content: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    analysis_id: int
+    source_url: str
+    source_title: str
+    source_category: str
+    extracted_information: str
+    raw_text: Optional[str] = None
+    publication_date: Optional[datetime] = None
+    retrieval_date: datetime
+    verification_status: str
+    related_agent: str
+    findings: List[Dict[str, Any]] = []
+    source_metadata: Dict[str, Any] = {}
+    content_hash: str
 
 
 class EvidenceCreate(EvidenceBase):
@@ -50,9 +58,27 @@ class EvidenceCreate(EvidenceBase):
 class EvidenceOut(EvidenceBase):
     id: int
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+
+class EvidenceSearchResponse(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    items: List[EvidenceOut]
+
+
+class EvidenceCollectionOut(BaseModel):
+    analysis_id: int
+    startup_id: int
+    retrieved_sources: int
+    stored_evidence: int
+    updated_evidence: int
+    skipped_sources: int
+    errors: List[str] = []
 
 
 class AgentOutputBase(BaseModel):
@@ -91,6 +117,30 @@ class ReportCreate(ReportBase):
 class ReportOut(ReportBase):
     id: int
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AnalysisCreate(BaseModel):
+    startup_name: str = Field(..., min_length=1, max_length=255)
+    website: HttpUrl
+    country: Optional[str] = Field(None, max_length=120)
+    industry: Optional[str] = Field(None, max_length=120)
+    additional_information: Optional[str] = Field(None, max_length=5000)
+
+
+class AnalysisOut(BaseModel):
+    id: int
+    startup_name: str
+    website: str
+    country: Optional[str] = None
+    industry: Optional[str] = None
+    additional_information: Optional[str] = None
+    status: str
+    overall_assessment: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

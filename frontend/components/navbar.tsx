@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -13,6 +14,12 @@ const navLinks = [
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const router = useRouter();
+
+  const goToDashboard = () => {
+    setIsOpen(false);
+    router.push("/dashboard");
+  };
 
   return (
     <nav className="fixed left-0 right-0 top-0 z-50 border-b border-border/70 bg-white/80 backdrop-blur-xl">
@@ -38,8 +45,8 @@ export function Navbar() {
                 {link.name}
               </Link>
             ))}
-            <Button variant="ghost" size="sm">Log in</Button>
-            <Button variant="primary" size="sm">Get started <span className="ml-1.5">→</span></Button>
+            <Button variant="ghost" size="sm" onClick={goToDashboard}>Log in</Button>
+            <Button variant="primary" size="sm" onClick={goToDashboard}>Get started <span className="ml-1.5">→</span></Button>
           </div>
 
           <button
@@ -61,7 +68,7 @@ export function Navbar() {
                   {link.name}
                 </Link>
               ))}
-              <Button variant="primary" size="sm" className="mt-2">Get started</Button>
+              <Button variant="primary" size="sm" className="mt-2" onClick={goToDashboard}>Get started</Button>
             </div>
           </div>
         )}

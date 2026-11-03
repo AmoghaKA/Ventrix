@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   BarChart3,
@@ -34,6 +35,8 @@ const workflowSteps = [
 ];
 
 export default function LandingPage() {
+  const router = useRouter();
+
   return (
     <main className="min-h-screen overflow-hidden bg-background selection:bg-blue-accent/20 selection:text-blue-accent">
       <Navbar />
@@ -54,7 +57,7 @@ export default function LandingPage() {
               Ventrix brings AI-powered research, evidence verification, and investor-grade reporting into one calm, collaborative workspace.
             </p>
             <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Button variant="primary" size="lg" className="w-full sm:w-auto">
+              <Button variant="primary" size="lg" className="w-full sm:w-auto" onClick={() => router.push("/dashboard")}>
                 Start due diligence <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <Button variant="secondary" size="lg" className="w-full sm:w-auto">
@@ -119,7 +122,7 @@ export default function LandingPage() {
       </section>
 
       <section className="px-6 pb-24">
-        <div className="mx-auto max-w-5xl overflow-hidden rounded-2xl bg-slate-900 px-6 py-16 text-center shadow-xl shadow-slate-300/50 md:px-12"><div className="mx-auto max-w-2xl"><p className="mb-4 text-sm font-bold uppercase tracking-widest text-blue-300">Move with confidence</p><h2 className="text-3xl font-bold tracking-tight text-white md:text-5xl">Your next great investment deserves better diligence.</h2><p className="mx-auto mt-5 max-w-xl text-slate-300">Start your first analysis today and see what your team can uncover in minutes.</p><Button variant="primary" size="lg" className="mt-8 bg-white text-blue-accent hover:bg-blue-50">Start your free analysis <ArrowRight className="ml-2 h-4 w-4" /></Button></div></div>
+        <div className="mx-auto max-w-5xl overflow-hidden rounded-2xl bg-slate-900 px-6 py-16 text-center shadow-xl shadow-slate-300/50 md:px-12"><div className="mx-auto max-w-2xl"><p className="mb-4 text-sm font-bold uppercase tracking-widest text-blue-300">Move with confidence</p><h2 className="text-3xl font-bold tracking-tight text-white md:text-5xl">Your next great investment deserves better diligence.</h2><p className="mx-auto mt-5 max-w-xl text-slate-300">Start your first analysis today and see what your team can uncover in minutes.</p><Button variant="primary" size="lg" className="mt-8 bg-white text-blue-accent hover:bg-blue-50" onClick={() => router.push("/dashboard")}>Start your free analysis <ArrowRight className="ml-2 h-4 w-4" /></Button></div></div>
       </section>
       <Footer />
     </main>
