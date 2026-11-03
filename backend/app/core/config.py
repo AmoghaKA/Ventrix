@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     NVIDIA_API_KEY: str = ""
     MISTRAL_API_KEY: str = ""
 
+    GEMINI_MODEL: str = "gemini-1.5-flash"
+    NVIDIA_MODEL: str = "nvidia/nemotron-70b-instruct"
+    MISTRAL_MODEL: str = "mistral-large-latest"
+    LLM_TIMEOUT_SECONDS: float = 30.0
+    LLM_MOCK_MODE: bool = True
+
     # Supabase (backend only - never expose service role key to frontend)
     SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""
