@@ -102,6 +102,45 @@ class Evidence(Base):
     )
 
 
+class DocumentExtractionFailure(Base):
+    """Persisted processing failure; deliberately separate from evidence."""
+
+    __tablename__ = "document_extraction_failures"
+    __table_args__ = (
+        UniqueConstraint(
+            "analysis_id",
+            "source_url",
+            name="uq_document_extraction_failure_analysis_source",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    startup_id = Column(
+        Integer,
+        ForeignKey("startups.id"),
+        nullable=False,
+        index=True,
+    )
+    analysis_id = Column(
+        Integer,
+        ForeignKey("analyses.id"),
+        nullable=False,
+        index=True,
+    )
+    source_url = Column(String(2048), nullable=False)
+    document_name = Column(String(512), nullable=True)
+    failure_stage = Column(String(64), nullable=False)
+    error_category = Column(String(64), nullable=False)
+    description = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+
 class RetrievalCacheEntry(Base):
     __tablename__ = "retrieval_cache"
 
