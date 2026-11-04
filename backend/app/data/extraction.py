@@ -152,7 +152,10 @@ class _DocumentParser(HTMLParser):
                 attributes.get("property")
                 or attributes.get("name")
                 or attributes.get("itemprop")
-            ).strip().lower()
+            )
+            if not key:
+                return
+            key = key.strip().lower()
             content = attributes.get("content", "").strip()
             if key and content:
                 self.meta.setdefault(key, content)

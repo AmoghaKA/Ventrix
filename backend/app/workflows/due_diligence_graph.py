@@ -165,12 +165,12 @@ async def _verification_node(
         return updates
 
 
-def _report_node(
+async def _report_node(
     controller: ControllerAgent,
     state: DueDiligenceState,
 ) -> Dict[str, Any]:
     try:
-        updates = controller.generate_report(state)
+        updates = await controller.generate_report(state)
         controller.persist_state(
             _state_snapshot(state, updates),
             "completed",
@@ -262,7 +262,7 @@ def build_due_diligence_graph(
         return await _verification_node(controller, state)
 
     async def report_node(state: DueDiligenceState):
-        return _report_node(controller, state)
+        return await _report_node(controller, state)
 
     graph.add_node("financial", financial_node)
     graph.add_node("marketing", marketing_node)

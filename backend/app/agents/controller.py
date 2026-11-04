@@ -3,6 +3,8 @@ import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+import logging
+
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
@@ -20,6 +22,8 @@ from app.db.models import (
     WorkflowAgentStatus,
     WorkflowCheckpoint,
 )
+from app.schemas.controller import ControllerAssessment
+from app.llm.gateway import llm_gateway
 from app.workflows.report import generate_final_report
 from app.workflows.status import (
     WorkflowAgentExecutionStatus as AgentStatus,
@@ -27,6 +31,16 @@ from app.workflows.status import (
 )
 
 _UNSET = object()
+
+logger = logging.getLogger("ventrix.controller")
+
+
+def _assessment_payload(value: Any) -> Any:
+    if hasattr(value, "model_dump"):
+        return value.model_dump()
+    if hasattr(value, "dict"):
+        return value.dict()
+    return value
 
 WORKFLOW_STEPS: Tuple[Tuple[str, str, int], ...] = (
     ("data_retrieval", "Data Retrieval", 1),
@@ -48,6 +62,7 @@ class ControllerAgent:
         retry_limit: Optional[int] = None,
         retry_backoff_seconds: float = 0.05,
         max_pages: int = 5,
+        llm_gateway_instance=llm_gateway,
     ) -> None:
         self.db = db
         self.workflow_id = workflow.id
@@ -56,6 +71,7 @@ class ControllerAgent:
         )
         self.retry_backoff_seconds = retry_backoff_seconds
         self.max_pages = max_pages
+        self.llm = llm_gateway_instance
         self._ensure_status_rows()
 
     def _workflow(self) -> DueDiligenceWorkflow:
@@ -689,7 +705,7 @@ class ControllerAgent:
             "verification": payload,
         }
 
-    def generate_report(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def generate_report(self, state: Dict[str, Any]) -> Dict[str, Any]:
         self.set_step_status("report", AgentStatus.RUNNING)
         self.log(
             "report_started",
@@ -700,6 +716,13 @@ class ControllerAgent:
         try:
             analysis = self._analysis()
             startup = self._startup()
+            controller_assessment = await self._assess(
+                analysis,
+                startup,
+                state.get("specialist_outputs", {}),
+                state.get("specialist_errors", {}),
+                state.get("verification"),
+            )
             report = generate_final_report(
                 analysis,
                 startup,
@@ -709,6 +732,7 @@ class ControllerAgent:
                 state.get("aggregation"),
                 workflow_id=self.workflow_id,
             )
+            report["controller_assessment"] = _assessment_payload(controller_assessment)
             workflow = self._workflow()
             workflow.report = jsonable_encoder(report)
             workflow.status = WorkflowStatus.COMPLETED.value
@@ -757,6 +781,58 @@ class ControllerAgent:
                 error_details=str(exc),
             )
             raise
+
+    async def _assess(
+        self,
+        analysis: Analysis,
+        startup: Startup,
+        specialist_outputs: Dict[str, Any],
+        specialist_errors: Dict[str, Any],
+        verification: Optional[Dict[str, Any]],
+    ) -> ControllerAssessment:
+        compact_outputs = {
+            key: {
+                "status": value.get("execution_status"),
+                "risk_level": value.get("risk_level"),
+                "evidence_status": value.get("evidence_status"),
+                "investor_impact": value.get("investor_impact"),
+                "missing_information": value.get("missing_information", []),
+            }
+            for key, value in specialist_outputs.items()
+        }
+        prompt = (
+            "You are the VENTRIX Controller Agent. Summarize the due diligence inputs below. "
+            "Do not fabricate financials, legal, market, or source data. Label unavailable information clearly.\n\n"
+            f"Startup: {analysis.startup_name} ({analysis.website})\n"
+            f"Industry: {analysis.industry or 'Not provided'}\n"
+            f"Country: {analysis.country or 'Not provided'}\n"
+            f"Specialist summaries: {compact_outputs}\n"
+            f"Specialist errors: {specialist_errors}\n"
+            f"Verification status: {verification.get('verification_status') if isinstance(verification, dict) else verification}\n\n"
+            "Return only a valid JSON object with keys: summary, key_risks, missing_information, recommended_next_steps."
+        )
+        for attempt in range(1, 4):
+            try:
+                result = await self.llm.generate(
+                    agent_name="Controller Agent",
+                    prompt=prompt,
+                    response_schema=ControllerAssessment,
+                )
+                if result.parsed is not None:
+                    return result.parsed
+                logger.warning(
+                    "Controller LLM returned an unparseable response on attempt %s.",
+                    attempt,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Controller LLM assessment failed on attempt %s: %s", attempt, exc)
+
+        return ControllerAssessment(
+            summary="Controller assessment unavailable; specialist outputs retained for review.",
+            key_risks=[],
+            missing_information=list(specialist_errors.values()) or ["No additional information provided."],
+            recommended_next_steps=["Review specialist agent outputs and evidence."],
+        )
 
     def fail_workflow(self, error: str) -> Dict[str, Any]:
         workflow = self._workflow()
