@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   getWorkflowAgents,
+  listAnalyses,
   runAgent,
   type WorkflowAgentStatusRecord,
 } from "@/lib/api";
@@ -22,14 +23,31 @@ const tabs = [
 
 function AgentTabsInner() {
   const params = useSearchParams();
-  const analysisId = params.get("analysis") || "1";
+  const requestedAnalysisId = params.get("analysis");
+  const [analysisId, setAnalysisId] = useState(requestedAnalysisId ?? "");
   const [agents, setAgents] = useState<WorkflowAgentStatusRecord[]>([]);
   const [active, setActive] = useState("financial");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (requestedAnalysisId) {
+      setAnalysisId(requestedAnalysisId);
+      return;
+    }
+    listAnalyses()
+      .then((items) => {
+        if (items.length > 0) setAnalysisId(String(items[0].id));
+      })
+      .catch(() => {});
+  }, [requestedAnalysisId]);
+
   const load = async () => {
+    if (!analysisId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {

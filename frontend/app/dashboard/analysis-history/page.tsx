@@ -13,7 +13,7 @@ export default function AnalysisHistoryPage() {
       <PageHeader
         eyebrow="Workspace"
         title="Analysis history"
-        description="Browse every analysis record in your workspace. The table below uses labelled demo data until analysis history is connected."
+        description="Browse every analysis record in your workspace. Browse every analysis record in your workspace."
       />
 
       <AnalysisTable />

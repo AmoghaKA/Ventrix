@@ -1,7 +1,18 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ArrowUpRight, Bot, Clock, FileCheck2, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { demoActivity } from "@/lib/demo-data";
+import { listAnalyses, type AnalysisRecord } from "@/lib/api";
+
+interface ActivityItem {
+  id: string;
+  title: string;
+  detail: string;
+  time: string;
+  kind: "report" | "agent" | "evidence" | "queue";
+}
 
 const activityMeta = {
   report: {
@@ -22,7 +33,52 @@ const activityMeta = {
   },
 };
 
+function formatTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function toActivity(analysis: AnalysisRecord): ActivityItem {
+  const completed = analysis.status === "completed";
+  return {
+    id: String(analysis.id),
+    title: `${analysis.startup_name} analysis ${analysis.status}`,
+    detail:
+      analysis.overall_assessment ||
+      (completed ? "Report is ready for review" : "Diligence run in progress"),
+    time: formatTime(analysis.created_at),
+    kind: completed ? "report" : "agent",
+  };
+}
+
 export function ActivityFeed() {
+  const [items, setItems] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    listAnalyses()
+      .then((analyses) =>
+        setItems(
+          [...analyses]
+            .sort(
+              (a, b) =>
+                new Date(b.created_at).getTime() -
+                new Date(a.created_at).getTime()
+            )
+            .slice(0, 8)
+            .map(toActivity)
+        )
+      )
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <div className="flex h-full flex-col rounded-2xl border border-slate-200/70 bg-white shadow-soft">
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
@@ -31,7 +87,7 @@ export function ActivityFeed() {
             Recent activity
           </h2>
           <p className="mt-1 text-xs text-slate-500">
-            What your diligence desk has been up to
+            Latest analysis activity from your workspace
           </p>
         </div>
         <span className="relative flex h-2 w-2">
@@ -41,10 +97,16 @@ export function ActivityFeed() {
       </div>
 
       <ul className="flex-1 space-y-1 p-5">
-        {demoActivity.map((item, index) => {
+        {loading && (
+          <li className="text-xs text-slate-500">Loading activity…</li>
+        )}
+        {!loading && items.length === 0 && (
+          <li className="text-xs text-slate-500">No activity yet.</li>
+        )}
+        {items.map((item, index) => {
           const meta = activityMeta[item.kind];
           const Icon = meta.icon;
-          const last = index === demoActivity.length - 1;
+          const last = index === items.length - 1;
           return (
             <li key={item.id} className="relative flex gap-3 pb-4 last:pb-0">
               {!last && (

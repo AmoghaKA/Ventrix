@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   ChevronDown,
@@ -9,41 +9,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-  demoAnalyses,
-  type DemoAnalysisStatus,
-  type DemoAssessment,
-} from "@/lib/demo-data";
-
-const statusVariant: Record<
-  DemoAnalysisStatus,
-  "success" | "warning" | "default"
-> = {
-  Completed: "success",
-  "In progress": "warning",
-  Pending: "default",
-};
-
-const assessmentVariant: Record<
-  DemoAssessment,
-  "success" | "warning" | "critical"
-> = {
-  Strong: "success",
-  Moderate: "warning",
-  "High risk": "critical",
-};
-
-const statusOptions: ("All statuses" | DemoAnalysisStatus)[] = [
-  "All statuses",
-  "Completed",
-  "In progress",
-  "Pending",
-];
-
-const industryOptions = [
-  "All industries",
-  ...Array.from(new Set(demoAnalyses.map((analysis) => analysis.industry))),
-];
+import { listAnalyses, type AnalysisRecord } from "@/lib/api";
 
 const avatarGradients = [
   "from-blue-500 to-indigo-600",
@@ -54,21 +20,66 @@ const avatarGradients = [
   "from-cyan-500 to-blue-600",
 ];
 
+function statusVariant(status: string) {
+  const normalized = status.toLowerCase();
+  if (normalized === "completed") return "success" as const;
+  if (normalized === "failed") return "critical" as const;
+  if (normalized === "running" || normalized === "in progress") return "warning" as const;
+  return "default" as const;
+}
+
+function assessmentVariant(value: string | null) {
+  const normalized = (value ?? "").toLowerCase();
+  if (/high|critical/.test(normalized)) return "critical" as const;
+  if (/moderate|medium/.test(normalized)) return "warning" as const;
+  if (/strong|low/.test(normalized)) return "success" as const;
+  return "default" as const;
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export function AnalysisTable() {
+  const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<(typeof statusOptions)[number]>(
-    "All statuses"
-  );
+  const [status, setStatus] = useState("All statuses");
   const [industry, setIndustry] = useState("All industries");
+
+  useEffect(() => {
+    listAnalyses()
+      .then(setAnalyses)
+      .catch(() => setAnalyses([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const statusOptions = useMemo(() => {
+    const values = Array.from(new Set(analyses.map((item) => item.status)));
+    return ["All statuses", ...values];
+  }, [analyses]);
+
+  const industryOptions = useMemo(() => {
+    const values = Array.from(
+      new Set(analyses.map((item) => item.industry).filter(Boolean))
+    ) as string[];
+    return ["All industries", ...values];
+  }, [analyses]);
 
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return demoAnalyses.filter((analysis) => {
+    return analyses.filter((analysis) => {
       const matchesQuery =
         !normalizedQuery ||
-        analysis.name.toLowerCase().includes(normalizedQuery) ||
-        analysis.industry.toLowerCase().includes(normalizedQuery);
+        analysis.startup_name.toLowerCase().includes(normalizedQuery) ||
+        (analysis.industry ?? "").toLowerCase().includes(normalizedQuery);
 
       const matchesStatus =
         status === "All statuses" || analysis.status === status;
@@ -77,21 +88,18 @@ export function AnalysisTable() {
 
       return matchesQuery && matchesStatus && matchesIndustry;
     });
-  }, [query, status, industry]);
+  }, [analyses, query, status, industry]);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-soft">
       <div className="border-b border-slate-100 p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-sm font-semibold tracking-tight text-slate-900">
-                Startup analyses
-              </h2>
-              <Badge variant="warning">Demo data</Badge>
-            </div>
+            <h2 className="text-sm font-semibold tracking-tight text-slate-900">
+              Startup analyses
+            </h2>
             <p className="mt-1 text-xs text-slate-500">
-              Search and filter preview records. No real company data is shown.
+              Search and filter analyses from your workspace.
             </p>
           </div>
 
@@ -112,9 +120,7 @@ export function AnalysisTable() {
               <SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
               <select
                 value={status}
-                onChange={(event) =>
-                  setStatus(event.target.value as (typeof statusOptions)[number])
-                }
+                onChange={(event) => setStatus(event.target.value)}
                 aria-label="Filter by status"
                 className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:border-slate-300 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10"
               >
@@ -170,61 +176,69 @@ export function AnalysisTable() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filtered.map((analysis, index) => (
-              <tr
-                key={analysis.id}
-                className="group transition-colors duration-150 hover:bg-slate-50/80"
-              >
-                <td className="px-5 py-4">
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${
-                        avatarGradients[index % avatarGradients.length]
-                      } text-xs font-bold text-white shadow-sm`}
-                    >
-                      {analysis.name.charAt(0)}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-900">
-                        {analysis.name}
-                      </p>
-                      <p className="mt-0.5 truncate text-[11px] text-slate-500">
-                        {analysis.country}
-                      </p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-5 py-4">
-                  <span className="inline-flex rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">
-                    {analysis.industry}
-                  </span>
-                </td>
-                <td className="px-5 py-4 text-xs text-slate-500">
-                  {analysis.date}
-                </td>
-                <td className="px-5 py-4">
-                  <Badge variant={statusVariant[analysis.status]}>
-                    {analysis.status}
-                  </Badge>
-                </td>
-                <td className="px-5 py-4">
-                  <Badge variant={assessmentVariant[analysis.assessment]}>
-                    {analysis.assessment}
-                  </Badge>
-                </td>
-                <td className="px-5 py-4 text-right">
-                  <Link
-                    href={`/dashboard/analyses/${analysis.id}`}
-                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50"
-                  >
-                    View report
-                    <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-                  </Link>
+            {loading && (
+              <tr>
+                <td colSpan={6} className="px-5 py-16 text-center text-xs text-slate-500">
+                  Loading analyses...
                 </td>
               </tr>
-            ))}
+            )}
+            {!loading &&
+              filtered.map((analysis, index) => (
+                <tr
+                  key={analysis.id}
+                  className="group transition-colors duration-150 hover:bg-slate-50/80"
+                >
+                  <td className="px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${
+                          avatarGradients[index % avatarGradients.length]
+                        } text-xs font-bold text-white shadow-sm`}
+                      >
+                        {analysis.startup_name.charAt(0)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-900">
+                          {analysis.startup_name}
+                        </p>
+                        <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                          {analysis.country ?? "Unknown location"}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4">
+                    <span className="inline-flex rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">
+                      {analysis.industry ?? "Unknown"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4 text-xs text-slate-500">
+                    {formatDate(analysis.created_at)}
+                  </td>
+                  <td className="px-5 py-4">
+                    <Badge variant={statusVariant(analysis.status)}>
+                      {analysis.status}
+                    </Badge>
+                  </td>
+                  <td className="px-5 py-4">
+                    <Badge variant={assessmentVariant(analysis.overall_assessment)}>
+                      {analysis.overall_assessment ?? "Unavailable"}
+                    </Badge>
+                  </td>
+                  <td className="px-5 py-4 text-right">
+                    <Link
+                      href={`/dashboard/analyses/${analysis.id}`}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50"
+                    >
+                      View report
+                      <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                    </Link>
+                  </td>
+                </tr>
+              ))}
 
-            {filtered.length === 0 && (
+            {!loading && filtered.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-5 py-16 text-center">
                   <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
@@ -247,7 +261,7 @@ export function AnalysisTable() {
         <p>
           Showing{" "}
           <span className="font-semibold text-slate-700">{filtered.length}</span>{" "}
-          of {demoAnalyses.length} analyses
+          of {analyses.length} analyses
         </p>
         <p className="flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
