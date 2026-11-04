@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   AlertCircle,
   ArrowLeft,
@@ -26,7 +26,6 @@ import {
   type WorkflowLogRecord,
   type WorkflowStatusRecord,
 } from "@/lib/api";
-import { demoAnalyses, type DemoAnalysisStatus } from "@/lib/demo-data";
 
 type StatusKey = "pending" | "running" | "completed" | "failed";
 
@@ -69,12 +68,6 @@ function normalizeStatus(status: string): StatusKey {
   return "pending";
 }
 
-function mapDemoStatus(status: DemoAnalysisStatus): StatusKey {
-  if (status === "Completed") return "completed";
-  if (status === "In progress") return "running";
-  return "pending";
-}
-
 function formatDate(value: string | null) {
   if (!value) return "Unavailable";
   const date = new Date(value);
@@ -86,16 +79,11 @@ function formatDate(value: string | null) {
 }
 
 export function AnalysisMonitor({ analysisId }: { analysisId: string }) {
-  const demo = useMemo(
-    () => demoAnalyses.find((analysis) => analysis.id === analysisId),
-    [analysisId]
-  );
-
   const [analysis, setAnalysis] = useState<AnalysisRecord | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowStatusRecord | null>(null);
   const [agents, setAgents] = useState<WorkflowAgentStatusRecord[]>([]);
   const [logs, setLogs] = useState<WorkflowLogRecord[]>([]);
-  const [loading, setLoading] = useState(!demo);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
 
@@ -130,12 +118,11 @@ export function AnalysisMonitor({ analysisId }: { analysisId: string }) {
   }, [analysisId]);
 
   useEffect(() => {
-    if (demo) return;
     setLoading(true);
     load();
     const interval = window.setInterval(load, 3000);
     return () => window.clearInterval(interval);
-  }, [demo, load]);
+  }, [load]);
 
   const handleStart = async () => {
     setStarting(true);
@@ -149,7 +136,7 @@ export function AnalysisMonitor({ analysisId }: { analysisId: string }) {
     }
   };
 
-  if (loading && !demo) {
+  if (loading) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-64 animate-pulse rounded-sm bg-secondary" />
@@ -158,7 +145,7 @@ export function AnalysisMonitor({ analysisId }: { analysisId: string }) {
     );
   }
 
-  if (error && !demo) {
+  if (error) {
     return (
       <Card className="p-6">
         <p className="text-sm text-critical">{error}</p>
@@ -170,19 +157,17 @@ export function AnalysisMonitor({ analysisId }: { analysisId: string }) {
     );
   }
 
-  const companyName = demo?.name ?? analysis?.startup_name ?? "Analysis";
-  const website = demo?.website ?? analysis?.website ?? null;
-  const industry = demo?.industry ?? analysis?.industry ?? null;
-  const country = demo?.country ?? analysis?.country ?? null;
-  const submittedAt = demo?.date ?? (analysis ? formatDate(analysis.created_at) : "Unavailable");
-  const assessment = demo?.assessment ?? analysis?.overall_assessment ?? null;
-  const status: StatusKey = demo
-    ? mapDemoStatus(demo.status)
-    : workflow
-      ? normalizeStatus(workflow.status)
-      : analysis
-        ? normalizeStatus(analysis.status)
-        : "pending";
+  const companyName = analysis?.startup_name ?? "Analysis";
+  const website = analysis?.website ?? null;
+  const industry = analysis?.industry ?? null;
+  const country = analysis?.country ?? null;
+  const submittedAt = analysis ? formatDate(analysis.created_at) : "Unavailable";
+  const assessment = analysis?.overall_assessment ?? null;
+  const status: StatusKey = workflow
+    ? normalizeStatus(workflow.status)
+    : analysis
+      ? normalizeStatus(analysis.status)
+      : "pending";
 
   const orderedAgents = [
     "data_retrieval",
@@ -209,14 +194,14 @@ export function AnalysisMonitor({ analysisId }: { analysisId: string }) {
       <PageHeader
         eyebrow="Analysis monitoring"
         title={companyName}
-        description={`Analysis ID: ${analysisId}${demo ? " · Demo data preview" : ""}`}
+        description={`Analysis ID: ${analysisId}`}
         actions={
           <>
             <Badge variant={statusMeta[status].variant}>
               {statusMeta[status].label}
             </Badge>
             {assessment && <Badge variant="success">{assessment}</Badge>}
-            {!demo && !hasWorkflow && (
+            {!hasWorkflow && (
               <Button size="sm" onClick={handleStart} disabled={starting}>
                 {starting ? (
                   <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />

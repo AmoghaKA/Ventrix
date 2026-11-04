@@ -142,7 +142,7 @@ export function DashboardShell({
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-xs font-semibold text-slate-900">
-                Acme Capital
+                Workspace
               </span>
               <span className="block truncate text-[11px] text-slate-500">
                 Pro workspace
@@ -187,10 +187,10 @@ export function DashboardShell({
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-semibold text-slate-900">
-                Alex Morgan
+                User
               </p>
               <p className="truncate text-[11px] text-slate-500">
-                Investment team
+                Team
               </p>
             </div>
             <button
@@ -270,10 +270,10 @@ export function DashboardShell({
                   </span>
                   <span className="hidden text-left leading-tight sm:block">
                     <span className="block text-xs font-semibold text-slate-900">
-                      Alex Morgan
+                      User
                     </span>
                     <span className="block text-[10px] text-slate-500">
-                      Acme Capital
+                      Workspace
                     </span>
                   </span>
                   <ChevronDown className="hidden h-3.5 w-3.5 text-slate-400 sm:block" />

@@ -36,11 +36,6 @@ def get_db():
 
 
 def init_db():
-    if "sqlite" in database_url:
-        from app.db import models  # noqa: F401
+    from app.db import models  # noqa: F401
 
-        Base.metadata.create_all(bind=engine)
-    else:
-        from app.db.ventrix_models import VentrixBase  # noqa: F401
-
-        VentrixBase.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=engine)

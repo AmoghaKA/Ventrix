@@ -34,11 +34,11 @@ export default function SettingsPage() {
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div className="rounded-sm border border-border bg-secondary/30 p-3">
             <p className="text-[10px] uppercase tracking-wider text-text-secondary">Name</p>
-            <p className="mt-1 text-sm text-text-primary">Ventrix User</p>
+            <p className="mt-1 text-sm text-text-primary">Not configured</p>
           </div>
           <div className="rounded-sm border border-border bg-secondary/30 p-3">
             <p className="text-[10px] uppercase tracking-wider text-text-secondary">Workspace</p>
-            <p className="mt-1 text-sm text-text-primary">Default workspace</p>
+            <p className="mt-1 text-sm text-text-primary">Not configured</p>
           </div>
         </div>
       </Card>

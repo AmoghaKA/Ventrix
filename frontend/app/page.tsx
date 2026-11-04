@@ -4,18 +4,15 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   BarChart3,
-  CircleCheck,
   FileCheck2,
   Globe2,
   Landmark,
   Play,
   ShieldCheck,
   Sparkles,
-  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 
@@ -73,30 +70,14 @@ export default function LandingPage() {
               <div className="flex items-center justify-between border-b border-border bg-slate-50/80 px-5 py-3">
                 <div className="flex items-center gap-2">
                   <div className="flex gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-300" /><span className="h-2.5 w-2.5 rounded-full bg-amber-300" /><span className="h-2.5 w-2.5 rounded-full bg-emerald-300" /></div>
-                  <span className="ml-3 text-xs font-medium text-slate-500">Ventrix / Acme Robotics</span>
+                  <span className="ml-3 text-xs font-medium text-slate-500">Ventrix / Workspace preview</span>
                 </div>
-                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-600">ANALYSIS COMPLETE</span>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">PREVIEW</span>
               </div>
-              <div className="grid gap-0 md:grid-cols-[1.1fr_2fr]">
-                <div className="border-b border-border p-6 md:border-b-0 md:border-r">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Investment snapshot</p>
-                  <div className="mt-5 flex items-end gap-3"><span className="text-5xl font-bold tracking-tight text-text-primary">8.4</span><span className="mb-2 text-sm text-emerald-600">/ 10</span></div>
-                  <p className="mt-1 text-sm font-medium text-emerald-600">Strong opportunity</p>
-                  <div className="mt-7 space-y-4">
-                    {[["Financial health", "8.9", "bg-emerald-500"], ["Market position", "7.8", "bg-blue-500"], ["Evidence confidence", "8.2", "bg-violet-500"]].map(([label, score, color]) => (
-                      <div key={label}><div className="mb-1.5 flex justify-between text-xs"><span className="text-slate-500">{label}</span><span className="font-semibold text-slate-700">{score}</span></div><div className="h-1.5 rounded-full bg-slate-100"><div className={`h-1.5 rounded-full ${color}`} style={{ width: `${Number(score) * 10}%` }} /></div></div>
-                    ))}
-                  </div>
-                </div>
-                <div className="p-6">
-                  <div className="flex items-center justify-between"><div><p className="text-sm font-bold text-text-primary">Key findings</p><p className="mt-1 text-xs text-text-secondary">Across 42 verified sources</p></div><TrendingUp className="h-5 w-5 text-emerald-500" /></div>
-                  <div className="mt-5 space-y-3">
-                    {[["Revenue grew 3.2x YoY", "Verified", "success"], ["TAM assumptions are well-supported", "Verified", "success"], ["Founder concentration risk", "Review", "warning"]].map(([finding, status, variant]) => (
-                      <div key={finding} className="flex items-center justify-between rounded-lg border border-border bg-slate-50/70 p-3"><div className="flex items-center gap-3"><CircleCheck className={`h-4 w-4 ${variant === "success" ? "text-emerald-500" : "text-amber-500"}`} /><span className="text-xs font-medium text-slate-700">{finding}</span></div><Badge variant={variant as "success" | "warning"}>{status}</Badge></div>
-                    ))}
-                  </div>
-                  <div className="mt-5 rounded-lg bg-blue-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Recommendation</p><p className="mt-1 text-sm font-semibold text-blue-950">Proceed to partner review</p></div>
-                </div>
+              <div className="p-6">
+                <p className="text-sm text-text-secondary">
+                  Run an analysis to populate this workspace with live results.
+                </p>
               </div>
             </div>
           </div>

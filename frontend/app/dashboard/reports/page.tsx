@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { downloadReportPdf, getReport, listAnalyses, type AnalysisRecord } from "@/lib/api";
 
 export default function InvestorReportsPage() {
-  const [analysisId, setAnalysisId] = useState("1");
+  const [analysisId, setAnalysisId] = useState("");
   const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
   const [report, setReport] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,12 @@ export default function InvestorReportsPage() {
 
   useEffect(() => {
     listAnalyses()
-      .then(setAnalyses)
+      .then((items) => {
+        setAnalyses(items);
+        if (items.length > 0 && !analysisId) {
+          setAnalysisId(String(items[0].id));
+        }
+      })
       .catch(() => setAnalyses([]));
   }, []);
 

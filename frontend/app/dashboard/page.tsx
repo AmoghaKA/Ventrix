@@ -7,32 +7,20 @@ import {
   ArrowRight,
   ArrowUpRight,
   BarChart3,
-  Bot,
   CircleCheck,
   Clock,
-  FileCheck2,
   FileText,
   PlusCircle,
   ShieldAlert,
   Sparkles,
-  Zap,
 } from "lucide-react";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { AnalysisTable } from "@/components/dashboard/analysis-table";
 import { PageHeader } from "@/components/dashboard/page-header";
-import { PerformanceChart } from "@/components/dashboard/performance-chart";
-import { ScoreRing } from "@/components/dashboard/score-ring";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { listAnalyses, type AnalysisRecord } from "@/lib/api";
-import { demoAnalyses } from "@/lib/demo-data";
-
-const scoreBreakdown = [
-  { label: "Financial health", value: 89, color: "bg-emerald-400" },
-  { label: "Market position", value: 78, color: "bg-blue-400" },
-  { label: "Evidence confidence", value: 82, color: "bg-violet-400" },
-];
 
 export default function DashboardPage() {
   const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
@@ -48,16 +36,14 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const total = analyses.length || demoAnalyses.length;
-  const completed = analyses.length
-    ? analyses.filter((analysis) => analysis.status === "completed").length
-    : demoAnalyses.filter((analysis) => analysis.status === "Completed").length;
+  const total = analyses.length;
+  const completed = analyses.filter(
+    (analysis) => analysis.status === "completed"
+  ).length;
   const pending = total - completed;
-  const highRisk = analyses.length
-    ? analyses.filter((analysis) =>
-        /high|critical/i.test(analysis.overall_assessment ?? "")
-      ).length
-    : demoAnalyses.filter((analysis) => analysis.assessment === "High risk").length;
+  const highRisk = analyses.filter((analysis) =>
+    /high|critical/i.test(analysis.overall_assessment ?? "")
+  ).length;
 
   return (
     <div className="space-y-7">
@@ -67,9 +53,6 @@ export default function DashboardPage() {
         description="Monitor diligence coverage, review live analysis activity, and move every startup toward a confident decision."
         actions={
           <>
-            <Badge variant="warning" className="hidden sm:inline-flex">
-              Preview data
-            </Badge>
             <Link
               href="/dashboard/reports"
               className={buttonStyles({
@@ -109,7 +92,7 @@ export default function DashboardPage() {
             <div>
               <div className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-full border border-blue-200/80 bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-blue-700 shadow-sm backdrop-blur">
                 <Sparkles className="h-3.5 w-3.5 text-blue-500" />
-                Q1 diligence sprint · 5 agents online
+                Specialist agents ready
                 <span className="ml-1 flex items-center gap-1 text-[10px] font-medium text-emerald-600">
                   <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-emerald-500" />
                   Live
@@ -123,34 +106,9 @@ export default function DashboardPage() {
                 </span>
               </h2>
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-600">
-                Your workspace is trending ahead of schedule. Five specialist
-                agents are live, every claim is being grounded, and reports are
-                ready for partner review.
+                Run due diligence on real startups and review evidence-backed
+                reports from your workspace.
               </p>
-
-              <div className="mt-6 max-w-xl">
-                <div className="flex items-center justify-between text-[11px] font-medium">
-                  <span className="text-slate-500">Workspace readiness</span>
-                  <span className="font-semibold text-slate-900">82%</span>
-                </div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200/80">
-                  <div className="h-full w-[82%] rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-400 shadow-[0_0_18px_rgba(59,130,246,0.35)]" />
-                </div>
-                <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px] text-slate-500">
-                  <span className="flex items-center gap-1.5">
-                    <Bot className="h-3.5 w-3.5 text-blue-500" />
-                    5 agents active
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <FileCheck2 className="h-3.5 w-3.5 text-emerald-500" />
-                    42 sources verified
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Zap className="h-3.5 w-3.5 text-amber-500" />
-                    +18.6% momentum
-                  </span>
-                </div>
-              </div>
 
               <div className="mt-7 flex flex-wrap items-center gap-2.5">
                 <Link
@@ -175,35 +133,13 @@ export default function DashboardPage() {
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                   Portfolio health
                 </p>
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-600 ring-1 ring-emerald-200/70">
-                  Strong
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 ring-1 ring-slate-200/70">
+                  No data
                 </span>
               </div>
-              <div className="mt-1 flex justify-center">
-                <ScoreRing score={84} display="8.4" caption="Portfolio score" />
-              </div>
-              <p className="mt-1 text-center text-[11px] text-slate-500">
-                <span className="font-semibold text-emerald-600">+0.6</span> vs.
-                last month
+              <p className="mt-6 text-center text-sm text-slate-500">
+                Portfolio scores will appear after completed analyses.
               </p>
-              <div className="mt-5 space-y-3">
-                {scoreBreakdown.map((item) => (
-                  <div key={item.label}>
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="text-slate-500">{item.label}</span>
-                      <span className="font-semibold text-slate-900">
-                        {(item.value / 10).toFixed(1)}
-                      </span>
-                    </div>
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-200/80">
-                      <div
-                        className={`h-full rounded-full ${item.color}`}
-                        style={{ width: `${item.value}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         </div>
@@ -217,49 +153,37 @@ export default function DashboardPage() {
           label="Total analyses"
           value={total}
           detail="Across your workspace"
-          delta="+12.5%"
-          trend="up"
           tone="blue"
           icon={BarChart3}
-          spark={[3, 5, 4, 6, 5, 8, 9]}
+          spark={[]}
         />
         <StatCard
           label="Completed"
           value={completed}
           detail="Reports ready to review"
-          delta="+8.2%"
-          trend="up"
           tone="emerald"
           icon={CircleCheck}
-          spark={[2, 4, 3, 5, 4, 6, 7]}
+          spark={[]}
         />
         <StatCard
           label="In pipeline"
           value={pending}
           detail="Diligence runs in motion"
-          delta="3 active"
-          trend="up"
           tone="amber"
           icon={Clock}
-          spark={[1, 2, 2, 3, 4, 3, 5]}
+          spark={[]}
         />
         <StatCard
           label="High risk flagged"
           value={highRisk}
           detail="Queued for partner review"
-          delta="-1"
-          trend="down"
           tone="rose"
           icon={ShieldAlert}
-          spark={[5, 4, 4, 3, 3, 2, 2]}
+          spark={[]}
         />
       </div>
 
-      <div
-        className="grid animate-fade-up gap-4 xl:grid-cols-[1.55fr_1fr]"
-        style={{ animationDelay: "140ms" }}
-      >
-        <PerformanceChart />
+      <div className="animate-fade-up" style={{ animationDelay: "140ms" }}>
         <ActivityFeed />
       </div>
 
