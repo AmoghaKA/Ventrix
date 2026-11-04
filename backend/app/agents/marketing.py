@@ -1,6 +1,6 @@
 
 import re
-from typing import List, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple
 
 from app.agents.evidence_agent import (
     DimensionSpec,
@@ -25,234 +25,128 @@ class MarketingAgent(EvidenceAgent):
         DimensionSpec(
             name="Industry overview",
             keywords=(
-                "industry",
-                "sector",
-                "market size",
-                "market overview",
-                "market landscape",
-                "ecosystem",
-                "addressable market",
-                " tam ",
-                " sam ",
+                "industry", "sector", "market size", "market overview",
+                "market landscape", "ecosystem", "addressable market",
+                " tam ", " sam ",
             ),
             risk_terms=(
-                "market decline",
-                "market contraction",
+                "market decline", "market contraction",
                 "regulatory pressure",
             ),
             critical_terms=("market collapse",),
             preferred_categories=("marketing", "company"),
         ),
-
         DimensionSpec(
             name="Market trends",
             keywords=(
-                "trend",
-                "demand",
-                "adoption",
-                "forecast",
-                "cagr",
-                "emerging",
-                "growth",
-                "tailwind",
-                "headwind",
-                "market shift",
-                "industry trend",
-                "consumer behaviour",
-                "customer behaviour",
-                "technology adoption",
-                "digital transformation",
-                "market opportunity",
-                "changing preferences",
-                "demand forecast",
-                "industry growth",
-                "market expansion",
-                "future outlook",
+                "trend", "demand", "adoption", "forecast", "cagr",
+                "emerging", "growth", "tailwind", "headwind",
+                "market shift", "industry trend", "consumer behaviour",
+                "customer behaviour", "technology adoption",
+                "digital transformation", "market opportunity",
+                "changing preferences", "demand forecast",
+                "industry growth", "market expansion", "future outlook",
             ),
             risk_terms=(
-                "slowdown",
-                "decline",
-                "headwind",
-                "saturation",
+                "slowdown", "decline", "headwind", "saturation",
                 "shrinking market",
             ),
             preferred_categories=("marketing",),
         ),
-
         DimensionSpec(
             name="Target customers",
             keywords=(
-                "customer",
-                "customers",
-                "client",
-                "clients",
-                "target market",
-                "smb",
-                "enterprise",
-                "mid-market",
-                "mid-sized",
-                "buyer",
-                "user segment",
-                "target audience",
-                "customer segment",
-                "customer profile",
-                "ideal customer",
-                "end user",
-                "business customer",
-                "consumer segment",
-                "buyer persona",
-                "customer demographics",
-                "customer needs",
-                "user demographics",
-                "b2b",
-                "b2c",
+                "customer", "customers", "client", "clients",
+                "target market", "smb", "enterprise", "mid-market",
+                "mid-sized", "buyer", "user segment", "target audience",
+                "customer segment", "customer profile", "ideal customer",
+                "end user", "business customer", "consumer segment",
+                "buyer persona", "customer demographics",
+                "customer needs", "user demographics", "b2b", "b2c",
             ),
             risk_terms=(
-                "customer concentration",
-                "customer churn",
+                "customer concentration", "customer churn",
                 "declining demand",
             ),
             preferred_categories=("marketing",),
         ),
-
         DimensionSpec(
             name="Competitor analysis",
             keywords=(
-                "competitor",
-                "competition",
-                "competitive",
-                "rival",
-                "alternative",
-                "market share",
-                "incumbent",
-                "direct competitor",
-                "indirect competitor",
-                "market leader",
-                "market player",
-                "substitute",
-                "versus",
-                "pricing",
-                "pricing model",
-                "product comparison",
-                "competitor analysis",
+                "competitor", "competition", "competitive", "rival",
+                "alternative", "market share", "incumbent",
+                "direct competitor", "indirect competitor",
+                "market leader", "market player", "substitute",
+                "versus", "pricing", "pricing model",
+                "product comparison", "competitor analysis",
                 "competitive landscape",
             ),
             risk_terms=(
-                "intense competition",
-                "price war",
-                "loss of market share",
-                "dominant competitor",
-                "high competition",
-                "competitive pressure",
-                "pricing pressure",
-                "aggressive pricing",
-                "low-cost competitor",
-                "market saturation",
+                "intense competition", "price war",
+                "loss of market share", "dominant competitor",
+                "high competition", "competitive pressure",
+                "pricing pressure", "aggressive pricing",
+                "low-cost competitor", "market saturation",
                 "strong incumbent",
             ),
             preferred_categories=("marketing",),
         ),
-
         DimensionSpec(
             name="Market positioning",
             keywords=(
-                "positioning",
-                "positioned",
-                "positions",
-                "value proposition",
-                "niche",
-                "category leader",
-                "brand",
-                "differentiated",
+                "positioning", "positioned", "positions",
+                "value proposition", "niche", "category leader",
+                "brand", "differentiated",
             ),
             risk_terms=(
-                "undifferentiated",
-                "commoditized",
-                "weak positioning",
+                "undifferentiated", "commoditized", "weak positioning",
             ),
             preferred_categories=("marketing", "company"),
         ),
-
         DimensionSpec(
             name="Competitive differentiation",
             keywords=(
-                "differentiation",
-                "proprietary",
-                "unique",
-                "moat",
-                "competitive advantage",
-                "integration",
-                "workflow",
+                "differentiation", "proprietary", "unique", "moat",
+                "competitive advantage", "integration", "workflow",
                 "replicable",
             ),
             risk_terms=(
-                "no moat",
-                "easily replicated",
-                "not differentiated",
-                "commodity product",
+                "no moat", "easily replicated",
+                "not differentiated", "commodity product",
             ),
             preferred_categories=("marketing", "company"),
         ),
-
         DimensionSpec(
             name="Growth opportunities",
             keywords=(
-                "expansion",
-                "opportunity",
-                "new market",
-                "partnership",
-                "channel",
-                "international",
-                "upsell",
-                "acquisition",
-                "growth opportunity",
-                "market penetration",
-                "new customer segment",
-                "product expansion",
-                "strategic partnership",
-                "distribution channel",
-                "geographic expansion",
-                "cross-selling",
-                "scaling",
+                "expansion", "opportunity", "new market",
+                "partnership", "channel", "international", "upsell",
+                "acquisition", "growth opportunity", "market penetration",
+                "new customer segment", "product expansion",
+                "strategic partnership", "distribution channel",
+                "geographic expansion", "cross-selling", "scaling",
             ),
             risk_terms=(
-                "limited growth",
-                "stagnant",
-                "declining demand",
+                "limited growth", "stagnant", "declining demand",
             ),
             preferred_categories=("marketing",),
         ),
-
         DimensionSpec(
             name="Market risks",
             keywords=(
-                "market risk",
-                "threat",
-                "regulatory",
-                "dependence",
-                "concentration",
-                "churn",
-                "pricing pressure",
-                "saturation",
-                "competition",
-                "market uncertainty",
-                "economic downturn",
-                "changing regulations",
-                "customer retention",
-                "market volatility",
+                "market risk", "threat", "regulatory", "dependence",
+                "concentration", "churn", "pricing pressure",
+                "saturation", "competition", "market uncertainty",
+                "economic downturn", "changing regulations",
+                "customer retention", "market volatility",
             ),
             risk_terms=(
-                "market risk",
-                "regulatory",
-                "customer concentration",
-                "churn",
-                "pricing pressure",
-                "saturation",
+                "market risk", "regulatory", "customer concentration",
+                "churn", "pricing pressure", "saturation",
                 "intense competition",
             ),
             critical_terms=(
-                "market collapse",
-                "loss of all customers",
+                "market collapse", "loss of all customers",
             ),
             preferred_categories=("marketing",),
         ),
@@ -293,11 +187,9 @@ class MarketingAgent(EvidenceAgent):
 
             score = len(hits)
 
-            # Prefer evidence from relevant source categories.
             if category in spec.preferred_categories:
                 score += 2
 
-            # Give additional weight when the title contains a matched keyword.
             if any(
                 re.search(
                     r"(?<!\w)" + re.escape(keyword.strip()) + r"(?!\w)",
@@ -316,7 +208,6 @@ class MarketingAgent(EvidenceAgent):
                 )
             )
 
-        # Rank evidence by relevance score, then evidence ID.
         matches.sort(
             key=lambda match: (
                 match.score,
@@ -325,5 +216,109 @@ class MarketingAgent(EvidenceAgent):
             reverse=True,
         )
 
-        # Return only the five most relevant evidence sources.
         return matches[:5]
+
+    def _extract_competitors(
+        self,
+        evidence: Sequence,
+    ) -> List[Dict]:
+        """
+        Extract explicitly named competitors from retrieved evidence.
+
+        Only extracts names following clear competitor-related phrases.
+        Each result retains its source evidence for traceability.
+        """
+
+        patterns = (
+            r"\bcompetitors?\s+include\s+(.+?)(?=\s+(?:in|across|within|for|while)\b|[.;:\n]|$)",
+            r"\bcompetitors?\s+such\s+as\s+(.+?)(?=\s+(?:in|across|within|for|while)\b|[.;:\n]|$)",
+            r"\bcompetes?\s+with\s+(.+?)(?=\s+(?:in|across|within|for|while)\b|[.;:\n]|$)",
+            r"\brivals?\s+include\s+(.+?)(?=\s+(?:in|across|within|for|while)\b|[.;:\n]|$)",
+            r"\brivals?\s+such\s+as\s+(.+?)(?=\s+(?:in|across|within|for|while)\b|[.;:\n]|$)",
+            r"\balternatives?\s+include\s+(.+?)(?=\s+(?:in|across|within|for|while)\b|[.;:\n]|$)",
+            r"\balternatives?\s+such\s+as\s+(.+?)(?=\s+(?:in|across|within|for|while)\b|[.;:\n]|$)",
+        )
+
+        generic_names = {
+            "incumbents",
+            "larger incumbents",
+            "competitors",
+            "other companies",
+            "other providers",
+            "market leaders",
+            "established players",
+            "other players",
+            "leading companies",
+            "major players",
+        }
+
+        competitors: Dict[str, Dict] = {}
+
+        for item in evidence:
+            text = self._evidence_text(item)
+
+            for pattern in patterns:
+                for match in re.finditer(
+                    pattern, text, re.IGNORECASE
+                ):
+                    names_text = match.group(1)
+
+                    names = re.split(
+                        r",|\band\b|\b&\b|\bversus\b|\bvs\.?\b",
+                        names_text,
+                        flags=re.IGNORECASE,
+                    )
+
+                    for name in names:
+                        name = name.strip(" \t\n:()-")
+
+                        name = re.sub(
+                            r"^(?:such as|including)\s+",
+                            "",
+                            name,
+                            flags=re.IGNORECASE,
+                        )
+
+                        name = re.sub(
+                            r"\s+(?:and other competitors|among others)$",
+                            "",
+                            name,
+                            flags=re.IGNORECASE,
+                        ).strip()
+
+                        if not name:
+                            continue
+
+                        if name.casefold() in generic_names:
+                            continue
+
+                        if len(name.split()) > 5:
+                            continue
+
+                        # Avoid treating generic descriptions as company names.
+                        if re.fullmatch(
+                            r"(?:larger|smaller|leading|major|established|"
+                            r"global|regional)\s+"
+                            r"(?:incumbents|companies|players|providers)",
+                            name,
+                            re.IGNORECASE,
+                        ):
+                            continue
+
+                        competitor_key = name.casefold()
+
+                        if competitor_key not in competitors:
+                            competitors[competitor_key] = {
+                                "name": name,
+                                "evidence_id": self._evidence_value(
+                                    item, "id"
+                                ),
+                                "source_title": self._evidence_value(
+                                    item, "source_title"
+                                ),
+                                "source_url": self._evidence_value(
+                                    item, "source_url"
+                                ),
+                            }
+
+        return list(competitors.values())
