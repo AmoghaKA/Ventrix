@@ -8,6 +8,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { NewAnalysisForm } from "@/components/dashboard/new-analysis-form";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { Card } from "@/components/ui/card";
 
 export const metadata: Metadata = {
@@ -44,27 +45,20 @@ const notes = [
 
 export default function NewDueDiligencePage() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       <Link
         href="/dashboard"
-        className="inline-flex items-center gap-1.5 text-xs font-medium text-text-secondary transition-colors duration-200 hover:text-blue-accent"
+        className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 transition-colors duration-200 hover:text-blue-600"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
         Back to dashboard
       </Link>
 
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-blue-accent">
-          New analysis
-        </p>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight text-text-primary md:text-3xl">
-          New due diligence
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-text-secondary">
-          Provide the essential company details below. Ventrix will create an
-          analysis record and take you to the monitoring page.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="New analysis"
+        title="New due diligence"
+        description="Provide the essential company details below. Ventrix will create an analysis record and take you to the monitoring page."
+      />
 
       <div className="grid items-start gap-6 xl:grid-cols-[1.5fr_1fr]">
         <Card className="p-6 md:p-7">

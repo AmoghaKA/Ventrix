@@ -11,6 +11,7 @@ import {
   Loader2,
   RefreshCw,
 } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -196,39 +197,36 @@ export function AnalysisMonitor({ analysisId }: { analysisId: string }) {
   const hasWorkflow = Boolean(workflow);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       <Link
         href="/dashboard"
-        className="inline-flex items-center gap-1.5 text-xs font-medium text-text-secondary transition-colors duration-200 hover:text-blue-accent"
+        className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 transition-colors duration-200 hover:text-blue-600"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
         Back to dashboard
       </Link>
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-blue-accent">
-            Analysis monitoring
-          </p>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-text-primary md:text-3xl">
-            {companyName}
-          </h1>
-          <p className="mt-2 text-sm text-text-secondary">
-            Analysis ID: <span className="font-medium text-text-primary">{analysisId}</span>
-            {demo && <span className="ml-2 text-warning">Demo data preview</span>}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={statusMeta[status].variant}>{statusMeta[status].label}</Badge>
-          {assessment && <Badge variant="success">{assessment}</Badge>}
-          {!demo && !hasWorkflow && (
-            <Button size="sm" onClick={handleStart} disabled={starting}>
-              {starting ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
-              Start workflow
-            </Button>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Analysis monitoring"
+        title={companyName}
+        description={`Analysis ID: ${analysisId}${demo ? " · Demo data preview" : ""}`}
+        actions={
+          <>
+            <Badge variant={statusMeta[status].variant}>
+              {statusMeta[status].label}
+            </Badge>
+            {assessment && <Badge variant="success">{assessment}</Badge>}
+            {!demo && !hasWorkflow && (
+              <Button size="sm" onClick={handleStart} disabled={starting}>
+                {starting ? (
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                ) : null}
+                Start workflow
+              </Button>
+            )}
+          </>
+        }
+      />
 
       <Card padding="none" className="overflow-hidden">
         <div className="border-b border-border px-5 py-4">

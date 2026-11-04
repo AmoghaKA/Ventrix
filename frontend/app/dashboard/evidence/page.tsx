@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -41,18 +41,12 @@ export default function EvidenceExplorerPage() {
   }, []);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-blue-accent">
-          Evidence explorer
-        </p>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight text-text-primary md:text-3xl">
-          Evidence Explorer
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-text-secondary">
-          Search and inspect stored evidence, sources, verification status, and related findings.
-        </p>
-      </div>
+    <div className="space-y-7">
+      <PageHeader
+        eyebrow="Evidence explorer"
+        title="Evidence explorer"
+        description="Search and inspect stored evidence, sources, verification status, and related findings."
+      />
 
       <Card className="p-5">
         <div className="grid gap-3 md:grid-cols-4">

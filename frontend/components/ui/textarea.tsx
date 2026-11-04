@@ -25,8 +25,8 @@ export function Textarea({
       <textarea
         id={id}
         className={cn(
-          "w-full rounded-sm border border-border bg-white px-3 py-2.5 text-sm text-text-primary placeholder:text-text-secondary/70 transition-colors duration-200 focus:border-blue-accent focus:outline-none focus:ring-1 focus:ring-blue-accent/30",
-          error && "border-critical focus:border-critical focus:ring-critical/30",
+          "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-text-primary shadow-sm transition-all duration-200 placeholder:text-text-secondary/60 hover:border-slate-300 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10",
+          error && "border-critical focus:border-critical focus:ring-critical/10",
           className
         )}
         {...props}

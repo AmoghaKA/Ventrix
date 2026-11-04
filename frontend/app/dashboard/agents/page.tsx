@@ -2,8 +2,8 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Bot, Play } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Play } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -67,28 +67,22 @@ function AgentTabsInner() {
   const findings = Array.isArray(output?.findings) ? output.findings : [];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-blue-accent">
-          Agent analysis
-        </p>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight text-text-primary md:text-3xl">
-          Individual Agent Results
-        </h1>
-        <p className="mt-2 text-sm text-text-secondary">
-          Analysis ID: {analysisId}. Results are loaded from the backend workflow.
-        </p>
-      </div>
+    <div className="space-y-7">
+      <PageHeader
+        eyebrow="Agent analysis"
+        title="Individual agent results"
+        description={`Analysis ID: ${analysisId}. Results are loaded from the backend workflow.`}
+      />
 
       <div className="flex flex-wrap gap-2">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActive(tab.key)}
-            className={`rounded-sm border px-3 py-2 text-xs font-medium transition-colors ${
+            className={`rounded-xl border px-3.5 py-2 text-xs font-semibold transition-colors ${
               active === tab.key
-                ? "border-blue-accent bg-blue-50 text-blue-accent"
-                : "border-border bg-white text-text-secondary hover:text-text-primary"
+                ? "border-blue-200 bg-blue-50 text-blue-700"
+                : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-800"
             }`}
           >
             {tab.label}

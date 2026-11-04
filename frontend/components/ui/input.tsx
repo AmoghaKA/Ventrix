@@ -17,8 +17,8 @@ export function Input({ className, label, error, ...props }: InputProps) {
       )}
       <input
         className={cn(
-          "w-full bg-secondary border border-border rounded-sm px-4 py-2.5 text-sm text-text-primary placeholder-text-secondary/60 focus:outline-none focus:ring-1 focus:ring-blue-accent transition-colors duration-200",
-          error && "border-critical focus:ring-critical",
+          "h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-text-primary shadow-sm transition-all duration-200 placeholder:text-text-secondary/60 hover:border-slate-300 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10",
+          error && "border-critical focus:border-critical focus:ring-critical/10",
           className
         )}
         {...props}

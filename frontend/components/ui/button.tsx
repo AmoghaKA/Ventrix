@@ -5,17 +5,17 @@ export type ButtonSize = "sm" | "md" | "lg";
 
 const variants: Record<ButtonVariant, string> = {
   primary:
-    "bg-blue-accent text-white shadow-sm hover:bg-blue-accent/90 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-blue-accent/50 focus:ring-offset-2 focus:ring-offset-background",
+    "bg-gradient-to-b from-blue-500 to-blue-600 text-white shadow-[0_10px_24px_-12px_rgba(37,99,235,0.9)] ring-1 ring-inset ring-white/20 hover:from-blue-500 hover:to-blue-700 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-2",
   secondary:
-    "bg-white text-text-primary border border-border shadow-sm hover:bg-secondary hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-border",
+    "bg-white text-text-primary border border-slate-200 shadow-sm hover:border-slate-300 hover:bg-slate-50 hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300",
   ghost:
-    "bg-transparent text-text-secondary hover:bg-secondary focus:outline-none",
+    "bg-transparent text-text-secondary hover:bg-slate-100 hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-200",
 };
 
 const sizes: Record<ButtonSize, string> = {
   sm: "px-4 py-2 text-xs",
-  md: "px-6 py-3 text-sm",
-  lg: "px-8 py-4 text-base",
+  md: "px-5 py-2.5 text-sm",
+  lg: "px-7 py-3.5 text-sm",
 };
 
 export function buttonStyles({
@@ -28,7 +28,7 @@ export function buttonStyles({
   className?: string;
 } = {}) {
   return cn(
-    "inline-flex items-center justify-center font-medium rounded-sm transition-all duration-200 disabled:pointer-events-none disabled:opacity-60",
+    "inline-flex items-center justify-center rounded-xl font-semibold tracking-tight transition-all duration-200 disabled:pointer-events-none disabled:opacity-60",
     variants[variant],
     sizes[size],
     className

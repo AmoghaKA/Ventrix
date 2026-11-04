@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileText } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -55,18 +55,12 @@ export default function InvestorReportsPage() {
   const sections = Array.isArray(report?.sections) ? report.sections : [];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-blue-accent">
-          Investor reports
-        </p>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight text-text-primary md:text-3xl">
-          Investor Report
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-text-secondary">
-          Load a generated report by analysis ID and export it as PDF.
-        </p>
-      </div>
+    <div className="space-y-7">
+      <PageHeader
+        eyebrow="Investor reports"
+        title="Investor report"
+        description="Load a generated report by analysis ID and export it as PDF."
+      />
 
       <Card className="p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">

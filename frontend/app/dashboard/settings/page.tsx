@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Settings } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { Card } from "@/components/ui/card";
 import { getSystemStatus, getSystemUsage, type SystemStatus, type SystemUsage } from "@/lib/api";
 
@@ -22,15 +22,12 @@ export default function SettingsPage() {
   }, []);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-blue-accent">
-          Settings
-        </p>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight text-text-primary md:text-3xl">
-          Settings and System Information
-        </h1>
-      </div>
+    <div className="space-y-7">
+      <PageHeader
+        eyebrow="Settings"
+        title="Settings and system information"
+        description="Manage your workspace profile, analysis usage, and provider configuration."
+      />
 
       <Card className="p-6">
         <h2 className="text-sm font-semibold text-text-primary">User profile</h2>
