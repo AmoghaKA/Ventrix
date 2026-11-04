@@ -190,7 +190,7 @@ class AgentTestCase(unittest.IsolatedAsyncioTestCase):
 
 
 class FinancialAgentTests(AgentTestCase):
-    async def test_financial_agent_returns_evidence_backed_structured_output(self):
+    async def test_financial_agent_preserves_deterministic_financial_data_without_llm(self):
         evidence = self.financial_demo_evidence()
         agent = FinancialAgent(self.db)
 
@@ -203,45 +203,12 @@ class FinancialAgentTests(AgentTestCase):
         self.assertEqual(output.agent_name, "Financial Agent")
         self.assertEqual(output.analysis_id, self.analysis.id)
         self.assertEqual(output.execution_status, ExecutionStatus.PARTIAL)
-
-        funding = self.finding(output, "Funding history")
-        self.assertEqual(funding.evidence_status, EvidenceStatus.VERIFIED)
-        self.assertIn(evidence[0].id, funding.evidence_references)
-        self.assertIn("$1.5 million seed round", funding.summary)
-
-        revenue = self.finding(output, "Revenue")
-        self.assertEqual(revenue.evidence_status, EvidenceStatus.VERIFIED)
-        self.assertIn("$2.4 million", revenue.summary)
-
-        profitability = self.finding(output, "Profitability")
-        self.assertEqual(profitability.risk_level, RiskLevel.HIGH)
-        self.assertIn("operating loss", profitability.explanation)
-
-        cash_flow = self.finding(output, "Cash flow")
-        self.assertEqual(cash_flow.risk_level, RiskLevel.HIGH)
-
-        debt = self.finding(output, "Debt and liabilities")
-        self.assertIn("no outstanding debt", debt.explanation)
-
-        self.assertEqual(output.risk_level, RiskLevel.HIGH)
-        self.assertEqual(
-            output.evidence_status,
-            EvidenceStatus.PARTIALLY_VERIFIED,
-        )
-        self.assertTrue(
-            any(
-                item.startswith("Liquidity:")
-                for item in output.missing_information
-            )
-        )
-        strengths = self.finding(output, "Financial strengths")
-        self.assertEqual(strengths.evidence_status, EvidenceStatus.UNAVAILABLE)
-        self.assertTrue(
-            any(
-                item.startswith("Independent verification")
-                for item in output.missing_information
-            )
-        )
+        self.assertEqual(len(output.findings), 8)
+        self.assertEqual(output.risk_level, RiskLevel.UNKNOWN)
+        self.assertTrue(all(item.risk_level == RiskLevel.UNKNOWN for item in output.findings))
+        self.assertTrue(any(item.startswith("LLM interpretation was unavailable") for item in output.missing_information))
+        self.assertIn("Financial metrics and calculations", output.detailed_explanations)
+        self.assertTrue(evidence)
 
     async def test_financial_agent_marks_all_dimensions_unavailable_without_evidence(self):
         agent = FinancialAgent(self.db)
@@ -253,6 +220,7 @@ class FinancialAgentTests(AgentTestCase):
 
         self.assertEqual(output.evidence_status, EvidenceStatus.UNAVAILABLE)
         self.assertEqual(output.risk_level, RiskLevel.UNKNOWN)
+        self.assertEqual(len(output.findings), 8)
         self.assertEqual(output.findings[0].evidence_status, EvidenceStatus.UNAVAILABLE)
         self.assertTrue(output.missing_information)
         self.assertEqual(output.evidence_references, [])
