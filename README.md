@@ -8,7 +8,7 @@ AI-powered startup due diligence platform built from an investor's perspective.
 - **Backend:** Python, FastAPI
 - **AI Orchestration:** LangGraph
 - **Data Validation:** Pydantic
-- **Database:** SQLite
+- **Database:** SQLite, Supabase
 - **LLM Providers:** Gemini (primary), NVIDIA Nemotron (secondary), Mistral (fallback)
 
 ## Project Structure
