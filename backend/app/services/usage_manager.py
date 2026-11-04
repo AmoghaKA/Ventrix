@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.ventrix_models import UsageLimit, VentrixBase
+from app.db.models import UsageLimit
 
 _manager_lock = threading.Lock()
 

@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.ventrix_models import VentrixBase
+from app.db.models import Base
 from app.services.usage_manager import UsageLimitExceeded, UsageLimitManager
 
 
@@ -16,11 +16,11 @@ class UsageManagerTests(unittest.TestCase):
             connect_args={"check_same_thread": False},
             poolclass=StaticPool,
         )
-        VentrixBase.metadata.create_all(self.engine)
+        Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
 
     def tearDown(self):
-        VentrixBase.metadata.drop_all(self.engine)
+        Base.metadata.drop_all(self.engine)
         self.engine.dispose()
 
     def test_success_increments_completed(self):

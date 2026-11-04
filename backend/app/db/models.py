@@ -1,4 +1,5 @@
-from datetime import datetime
+import uuid
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     JSON,
@@ -9,9 +10,11 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    CheckConstraint,
 )
 
 from app.db.session import Base
+from sqlalchemy.types import UUID
 
 
 class Analysis(Base):
@@ -276,3 +279,27 @@ class WorkflowCheckpoint(Base):
     step = Column(String(64), nullable=False)
     state = Column(JSON, nullable=False, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+def _now_utc():
+    return datetime.now(timezone.utc)
+
+
+class UsageLimit(Base):
+    __tablename__ = "usage_limits"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    scope = Column(String(16), nullable=False)
+    scope_id = Column(String(255), nullable=True)
+    max_analyses = Column(Integer, nullable=False, default=10)
+    used_analyses = Column(Integer, nullable=False, default=0)
+    reserved_count = Column(Integer, nullable=False, default=0)
+    period_start = Column(DateTime(timezone=True), nullable=True)
+    period_end = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_now_utc)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_now_utc, onupdate=_now_utc)
+
+    __table_args__ = (
+        UniqueConstraint("scope", "scope_id", name="uq_usage_limits_scope"),
+        CheckConstraint("scope in ('global','user')", name="ck_usage_limits_scope"),
+    )

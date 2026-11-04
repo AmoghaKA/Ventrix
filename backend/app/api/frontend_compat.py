@@ -64,6 +64,7 @@ async def start_analysis(
     db.add(analysis)
     db.commit()
     db.refresh(analysis)
+    db.commit()  # close transaction opened by refresh() before next usage-manager call
 
     manager.reserve_analysis(db)
 
@@ -85,6 +86,7 @@ async def start_analysis(
 
             final = db.get(DueDiligenceWorkflow, workflow_id)
             success = final is not None and final.status == WorkflowStatus.COMPLETED.value
+            db.commit()
             UsageLimitManager().complete_analysis(db, success)
         finally:
             db.close()
