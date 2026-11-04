@@ -1,3 +1,4 @@
+
 from typing import Tuple
 
 from app.agents.evidence_agent import DimensionSpec, EvidenceAgent
@@ -9,10 +10,12 @@ class MarketingAgent(EvidenceAgent):
     AGENT_NAME = "Marketing Agent"
     MISSING_LABEL = "Missing market information"
     RELEVANT_CATEGORIES = ("marketing", "company")
+
     CAVEAT = (
         "Market evidence is limited to retrieved public sources; marketing "
         "claims have not been independently validated."
     )
+
     DIMENSION_SPECS: Tuple[DimensionSpec, ...] = (
         DimensionSpec(
             name="Industry overview",
@@ -35,6 +38,7 @@ class MarketingAgent(EvidenceAgent):
             critical_terms=("market collapse",),
             preferred_categories=("marketing", "company"),
         ),
+
         DimensionSpec(
             name="Market trends",
             keywords=(
@@ -48,6 +52,17 @@ class MarketingAgent(EvidenceAgent):
                 "tailwind",
                 "headwind",
                 "market shift",
+                "industry trend",
+                "consumer behaviour",
+                "customer behaviour",
+                "technology adoption",
+                "digital transformation",
+                "market opportunity",
+                "changing preferences",
+                "demand forecast",
+                "industry growth",
+                "market expansion",
+                "future outlook",
             ),
             risk_terms=(
                 "slowdown",
@@ -58,6 +73,7 @@ class MarketingAgent(EvidenceAgent):
             ),
             preferred_categories=("marketing",),
         ),
+
         DimensionSpec(
             name="Target customers",
             keywords=(
@@ -72,6 +88,19 @@ class MarketingAgent(EvidenceAgent):
                 "mid-sized",
                 "buyer",
                 "user segment",
+                "target audience",
+                "customer segment",
+                "customer profile",
+                "ideal customer",
+                "end user",
+                "business customer",
+                "consumer segment",
+                "buyer persona",
+                "customer demographics",
+                "customer needs",
+                "user demographics",
+                "b2b",
+                "b2c",
             ),
             risk_terms=(
                 "customer concentration",
@@ -80,6 +109,7 @@ class MarketingAgent(EvidenceAgent):
             ),
             preferred_categories=("marketing",),
         ),
+
         DimensionSpec(
             name="Competitor analysis",
             keywords=(
@@ -90,15 +120,34 @@ class MarketingAgent(EvidenceAgent):
                 "alternative",
                 "market share",
                 "incumbent",
+                "direct competitor",
+                "indirect competitor",
+                "market leader",
+                "market player",
+                "substitute",
+                "versus",
+                "pricing",
+                "pricing model",
+                "product comparison",
+                "competitor analysis",
+                "competitive landscape",
             ),
             risk_terms=(
                 "intense competition",
                 "price war",
                 "loss of market share",
                 "dominant competitor",
+                "high competition",
+                "competitive pressure",
+                "pricing pressure",
+                "aggressive pricing",
+                "low-cost competitor",
+                "market saturation",
+                "strong incumbent",
             ),
             preferred_categories=("marketing",),
         ),
+
         DimensionSpec(
             name="Market positioning",
             keywords=(
@@ -118,6 +167,7 @@ class MarketingAgent(EvidenceAgent):
             ),
             preferred_categories=("marketing", "company"),
         ),
+
         DimensionSpec(
             name="Competitive differentiation",
             keywords=(
@@ -138,6 +188,7 @@ class MarketingAgent(EvidenceAgent):
             ),
             preferred_categories=("marketing", "company"),
         ),
+
         DimensionSpec(
             name="Growth opportunities",
             keywords=(
@@ -150,6 +201,14 @@ class MarketingAgent(EvidenceAgent):
                 "upsell",
                 "acquisition",
                 "growth opportunity",
+                "market penetration",
+                "new customer segment",
+                "product expansion",
+                "strategic partnership",
+                "distribution channel",
+                "geographic expansion",
+                "cross-selling",
+                "scaling",
             ),
             risk_terms=(
                 "limited growth",
@@ -158,6 +217,7 @@ class MarketingAgent(EvidenceAgent):
             ),
             preferred_categories=("marketing",),
         ),
+
         DimensionSpec(
             name="Market risks",
             keywords=(
@@ -170,6 +230,11 @@ class MarketingAgent(EvidenceAgent):
                 "pricing pressure",
                 "saturation",
                 "competition",
+                "market uncertainty",
+                "economic downturn",
+                "changing regulations",
+                "customer retention",
+                "market volatility",
             ),
             risk_terms=(
                 "market risk",
@@ -180,7 +245,10 @@ class MarketingAgent(EvidenceAgent):
                 "saturation",
                 "intense competition",
             ),
-            critical_terms=("market collapse", "loss of all customers"),
+            critical_terms=(
+                "market collapse",
+                "loss of all customers",
+            ),
             preferred_categories=("marketing",),
         ),
     )
