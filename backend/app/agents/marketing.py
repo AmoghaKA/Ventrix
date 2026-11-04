@@ -1,7 +1,12 @@
 
-from typing import Tuple
+import re
+from typing import List, Sequence, Tuple
 
-from app.agents.evidence_agent import DimensionSpec, EvidenceAgent
+from app.agents.evidence_agent import (
+    DimensionSpec,
+    EvidenceAgent,
+    _Match,
+)
 
 
 class MarketingAgent(EvidenceAgent):
@@ -252,3 +257,73 @@ class MarketingAgent(EvidenceAgent):
             preferred_categories=("marketing",),
         ),
     )
+
+    def _match_dimension(
+        self,
+        spec: DimensionSpec,
+        evidence: Sequence,
+    ) -> List[_Match]:
+        """Match relevant evidence using complete words and phrases."""
+
+        matches: List[_Match] = []
+
+        for item in evidence:
+            text = self._evidence_text(item)
+            lowered = text.lower()
+
+            hits = [
+                keyword
+                for keyword in spec.keywords
+                if re.search(
+                    r"(?<!\w)" + re.escape(keyword.strip()) + r"(?!\w)",
+                    lowered,
+                )
+            ]
+
+            if not hits:
+                continue
+
+            category = str(
+                self._evidence_value(item, "source_category") or ""
+            ).lower()
+
+            title = str(
+                self._evidence_value(item, "source_title") or ""
+            )
+
+            score = len(hits)
+
+            # Prefer evidence from relevant source categories.
+            if category in spec.preferred_categories:
+                score += 2
+
+            # Give additional weight when the title contains a matched keyword.
+            if any(
+                re.search(
+                    r"(?<!\w)" + re.escape(keyword.strip()) + r"(?!\w)",
+                    title.lower(),
+                )
+                for keyword in hits
+            ):
+                score += 1
+
+            matches.append(
+                _Match(
+                    evidence=item,
+                    text=text,
+                    snippet=self._best_snippet(text, hits),
+                    score=score,
+                )
+            )
+
+        # Rank evidence by relevance score, then evidence ID.
+        matches.sort(
+            key=lambda match: (
+                match.score,
+                self._evidence_value(match.evidence, "id"),
+            ),
+            reverse=True,
+        )
+
+        # Return only the five most relevant evidence sources.
+        return matches[:5]

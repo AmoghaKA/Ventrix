@@ -1,8 +1,8 @@
+
 """Agent tests using clearly labelled demonstration data only.
 
-Every evidence record below is fictional and marked "[DEMO]". The example
-domain is reserved for documentation, so none of the findings describe a real
-company.
+Every evidence record below is fictional and marked "[DEMO]".
+The example domain is reserved for documentation.
 """
 
 import unittest
@@ -71,7 +71,10 @@ class AgentTestCase(unittest.IsolatedAsyncioTestCase):
         evidence = Evidence(
             startup_id=self.startup.id,
             analysis_id=self.analysis.id,
-            source_url=f"https://demo.ventrix.example/{title.lower().replace(' ', '-')}",
+            source_url=(
+                "https://demo.ventrix.example/"
+                f"{title.lower().replace(' ', '-')}"
+            ),
             source_title=f"[DEMO] {title}",
             source_category=category,
             extracted_information=f"DEMO DATA ONLY. {text}",
@@ -186,10 +189,14 @@ class AgentTestCase(unittest.IsolatedAsyncioTestCase):
         ]
 
     def finding(self, output, dimension):
-        return next(item for item in output.findings if item.dimension == dimension)
+        return next(
+            item for item in output.findings
+            if item.dimension == dimension
+        )
 
 
 class FinancialAgentTests(AgentTestCase):
+
     async def test_financial_agent_returns_evidence_backed_structured_output(self):
         evidence = self.financial_demo_evidence()
         agent = FinancialAgent(self.db)
@@ -228,14 +235,20 @@ class FinancialAgentTests(AgentTestCase):
             output.evidence_status,
             EvidenceStatus.PARTIALLY_VERIFIED,
         )
+
         self.assertTrue(
             any(
                 item.startswith("Liquidity:")
                 for item in output.missing_information
             )
         )
+
         strengths = self.finding(output, "Financial strengths")
-        self.assertEqual(strengths.evidence_status, EvidenceStatus.UNAVAILABLE)
+        self.assertEqual(
+            strengths.evidence_status,
+            EvidenceStatus.UNAVAILABLE,
+        )
+
         self.assertTrue(
             any(
                 item.startswith("Independent verification")
@@ -253,12 +266,23 @@ class FinancialAgentTests(AgentTestCase):
 
         self.assertEqual(output.evidence_status, EvidenceStatus.UNAVAILABLE)
         self.assertEqual(output.risk_level, RiskLevel.UNKNOWN)
-        self.assertEqual(output.findings[0].evidence_status, EvidenceStatus.UNAVAILABLE)
+        self.assertEqual(
+            output.findings[0].evidence_status,
+            EvidenceStatus.UNAVAILABLE,
+        )
         self.assertTrue(output.missing_information)
         self.assertEqual(output.evidence_references, [])
 
 
 class MarketingAgentTests(AgentTestCase):
+
+    def get_spec(self, dimension):
+        agent = MarketingAgent(self.db)
+        return next(
+            spec for spec in agent.DIMENSION_SPECS
+            if spec.name == dimension
+        )
+
     async def test_marketing_agent_uses_demo_market_evidence(self):
         self.marketing_demo_evidence()
         agent = MarketingAgent(self.db)
@@ -270,26 +294,150 @@ class MarketingAgentTests(AgentTestCase):
 
         self.assertEqual(output.agent_name, "Marketing Agent")
         self.assertEqual(output.execution_status, ExecutionStatus.PARTIAL)
-        self.assertEqual(output.evidence_status, EvidenceStatus.PARTIALLY_VERIFIED)
+        self.assertEqual(
+            output.evidence_status,
+            EvidenceStatus.PARTIALLY_VERIFIED,
+        )
         self.assertEqual(output.risk_level, RiskLevel.HIGH)
 
         customers = self.finding(output, "Target customers")
         self.assertIn("finance teams", customers.summary)
-        self.assertEqual(customers.evidence_status, EvidenceStatus.VERIFIED)
+        self.assertEqual(
+            customers.evidence_status,
+            EvidenceStatus.VERIFIED,
+        )
 
         competitors = self.finding(output, "Competitor analysis")
         self.assertEqual(competitors.risk_level, RiskLevel.HIGH)
         self.assertIn("intense competition", competitors.explanation)
 
-        differentiation = self.finding(output, "Competitive differentiation")
+        differentiation = self.finding(
+            output,
+            "Competitive differentiation",
+        )
         self.assertIn("proprietary", differentiation.explanation)
 
-        self.assertIn("market size", output.detailed_explanations[
-            "Industry overview"
-        ].lower())
+        self.assertIn(
+            "market size",
+            output.detailed_explanations["Industry overview"].lower(),
+        )
+
+    def test_matching_rejects_accidental_substring(self):
+        evidence = self.add_evidence(
+            title="General research",
+            category="marketing",
+            text="The company is enterprising and innovative.",
+        )
+
+        agent = MarketingAgent(self.db)
+        matches = agent._match_dimension(
+            self.get_spec("Target customers"),
+            [evidence],
+        )
+
+        self.assertEqual(matches, [])
+
+    def test_matching_accepts_complete_keyword(self):
+        evidence = self.add_evidence(
+            title="Enterprise customers",
+            category="marketing",
+            text="The company serves enterprise customers.",
+        )
+
+        agent = MarketingAgent(self.db)
+        matches = agent._match_dimension(
+            self.get_spec("Target customers"),
+            [evidence],
+        )
+
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0].evidence.id, evidence.id)
+
+    def test_matching_accepts_complete_phrase(self):
+        evidence = self.add_evidence(
+            title="Pricing research",
+            category="marketing",
+            text="The competitor uses a flexible pricing model.",
+        )
+
+        agent = MarketingAgent(self.db)
+        matches = agent._match_dimension(
+            self.get_spec("Competitor analysis"),
+            [evidence],
+        )
+
+        self.assertEqual(len(matches), 1)
+        self.assertIn("pricing model", matches[0].snippet.lower())
+
+    def test_matching_supports_singular_and_plural_customer_keywords(self):
+        singular = self.add_evidence(
+            title="Customer profile",
+            category="marketing",
+            text="The ideal customer is a finance manager.",
+        )
+
+        plural = self.add_evidence(
+            title="Customers research",
+            category="marketing",
+            text="The company serves customers across multiple industries.",
+        )
+
+        agent = MarketingAgent(self.db)
+        matches = agent._match_dimension(
+            self.get_spec("Target customers"),
+            [singular, plural],
+        )
+
+        matched_ids = {
+            match.evidence.id for match in matches
+        }
+
+        self.assertIn(singular.id, matched_ids)
+        self.assertIn(plural.id, matched_ids)
+
+    def test_matching_ranks_preferred_category_and_title_higher(self):
+        preferred = self.add_evidence(
+            title="Market overview",
+            category="marketing",
+            text="The industry has several established players.",
+        )
+
+        non_preferred = self.add_evidence(
+            title="General report",
+            category="company",
+            text="The industry has several established players.",
+        )
+
+        agent = MarketingAgent(self.db)
+        matches = agent._match_dimension(
+            self.get_spec("Industry overview"),
+            [non_preferred, preferred],
+        )
+
+        self.assertEqual(matches[0].evidence.id, preferred.id)
+        self.assertGreater(matches[0].score, matches[1].score)
+
+    def test_matching_returns_at_most_five_evidence_sources(self):
+        evidence = [
+            self.add_evidence(
+                title=f"Market report {index}",
+                category="marketing",
+                text="The industry has a growing market and demand.",
+            )
+            for index in range(7)
+        ]
+
+        agent = MarketingAgent(self.db)
+        matches = agent._match_dimension(
+            self.get_spec("Market trends"),
+            evidence,
+        )
+
+        self.assertEqual(len(matches), 5)
 
 
 class LegalAgentTests(AgentTestCase):
+
     async def test_legal_agent_reports_evidence_without_claiming_compliance(self):
         self.legal_demo_evidence()
         agent = LegalAgent(self.db)
@@ -300,8 +448,15 @@ class LegalAgentTests(AgentTestCase):
         )
 
         self.assertEqual(output.agent_name, "Legal Agent")
-        registration = self.finding(output, "Company registration information")
-        self.assertEqual(registration.evidence_status, EvidenceStatus.VERIFIED)
+
+        registration = self.finding(
+            output,
+            "Company registration information",
+        )
+        self.assertEqual(
+            registration.evidence_status,
+            EvidenceStatus.VERIFIED,
+        )
         self.assertIn("company number 1234567", registration.summary)
 
         compliance = self.finding(output, "Compliance concerns")
@@ -311,19 +466,30 @@ class LegalAgentTests(AgentTestCase):
         )
         self.assertIn("privacy notice", compliance.explanation)
 
-        ip = self.finding(output, "Potential intellectual property concerns")
-        self.assertEqual(ip.evidence_status, EvidenceStatus.UNVERIFIED)
+        ip = self.finding(
+            output,
+            "Potential intellectual property concerns",
+        )
+        self.assertEqual(
+            ip.evidence_status,
+            EvidenceStatus.UNVERIFIED,
+        )
 
         serialised = output.model_dump_json().lower()
         self.assertNotIn("legally compliant", serialised)
         self.assertNotIn("is compliant", serialised)
+
         self.assertTrue(
             any(
                 item.startswith("Available legal records:")
                 for item in output.missing_information
             )
         )
-        self.assertEqual(output.evidence_status, EvidenceStatus.PARTIALLY_VERIFIED)
+
+        self.assertEqual(
+            output.evidence_status,
+            EvidenceStatus.PARTIALLY_VERIFIED,
+        )
 
     async def test_legal_agent_returns_unknown_when_no_legal_evidence(self):
         agent = LegalAgent(self.db)
@@ -333,10 +499,18 @@ class LegalAgentTests(AgentTestCase):
             {"analysis_id": self.analysis.id},
         )
 
-        self.assertEqual(output.evidence_status, EvidenceStatus.UNAVAILABLE)
+        self.assertEqual(
+            output.evidence_status,
+            EvidenceStatus.UNAVAILABLE,
+        )
         self.assertEqual(output.risk_level, RiskLevel.UNKNOWN)
-        registration = self.finding(output, "Company registration information")
+
+        registration = self.finding(
+            output,
+            "Company registration information",
+        )
         self.assertEqual(registration.risk_level, RiskLevel.UNKNOWN)
+
         self.assertIn(
             "Company registration information: no supporting evidence was found.",
             output.missing_information,
@@ -344,6 +518,7 @@ class LegalAgentTests(AgentTestCase):
 
 
 class AgentExecutionTests(AgentTestCase):
+
     async def test_missing_analysis_id_returns_structured_failure(self):
         agent = LegalAgent(self.db)
 
@@ -353,7 +528,10 @@ class AgentExecutionTests(AgentTestCase):
         self.assertEqual(output.execution_status, ExecutionStatus.FAILED)
         self.assertEqual(output.analysis_id, 0)
         self.assertIn("analysis_id is required", output.error_details)
-        self.assertEqual(output.evidence_status, EvidenceStatus.UNAVAILABLE)
+        self.assertEqual(
+            output.evidence_status,
+            EvidenceStatus.UNAVAILABLE,
+        )
 
     async def test_agents_work_independently(self):
         self.financial_demo_evidence()
@@ -361,14 +539,31 @@ class AgentExecutionTests(AgentTestCase):
         self.legal_demo_evidence()
 
         context = {"analysis_id": self.analysis.id}
-        financial = await FinancialAgent(self.db).execute(self.startup.id, context)
-        marketing = await MarketingAgent(self.db).execute(self.startup.id, context)
-        legal = await LegalAgent(self.db).execute(self.startup.id, context)
+
+        financial = await FinancialAgent(self.db).execute(
+            self.startup.id,
+            context,
+        )
+        marketing = await MarketingAgent(self.db).execute(
+            self.startup.id,
+            context,
+        )
+        legal = await LegalAgent(self.db).execute(
+            self.startup.id,
+            context,
+        )
 
         self.assertEqual(financial.agent_name, "Financial Agent")
         self.assertEqual(marketing.agent_name, "Marketing Agent")
         self.assertEqual(legal.agent_name, "Legal Agent")
+
         self.assertNotEqual(
-            {ref.evidence_id for ref in financial.evidence_references},
-            {ref.evidence_id for ref in legal.evidence_references},
+            {
+                ref.evidence_id
+                for ref in financial.evidence_references
+            },
+            {
+                ref.evidence_id
+                for ref in legal.evidence_references
+            },
         )
