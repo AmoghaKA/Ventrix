@@ -289,6 +289,68 @@ class MarketingAgentTests(AgentTestCase):
         ].lower())
 
 
+
+    async def test_marketing_agent_matches_expanded_market_intelligence_keywords(self):
+        evidence_items = [
+            (
+                "Technology adoption trend",
+                "The industry is seeing rapid technology adoption and digital "
+                "transformation, creating a changing market outlook.",
+                "Market trends",
+            ),
+            (
+                "Buyer persona research",
+                "The ideal customer profile and buyer persona are mid-sized "
+                "business finance teams with specific customer needs.",
+                "Target customers",
+            ),
+            (
+                "Competitor landscape update",
+                "A direct competitor and several market leaders compete through "
+                "different pricing models. The market also faces pricing pressure.",
+                "Competitor analysis",
+            ),
+            (
+                "Expansion strategy",
+                "Growth opportunities include geographic expansion, strategic "
+                "partnerships and new distribution channels.",
+                "Growth opportunities",
+            ),
+            (
+                "Market risk outlook",
+                "The business faces market volatility, economic downturn risk "
+                "and changing regulations.",
+                "Market risks",
+            ),
+        ]
+
+        created_evidence = {}
+        for title, text, dimension in evidence_items:
+            created_evidence[dimension] = self.add_evidence(
+                title=title,
+                category="marketing",
+                text=text,
+                status="verified",
+                related_agent="market_analysis_agent",
+            )
+
+        agent = MarketingAgent(self.db)
+        output = await agent.execute(
+            self.startup.id,
+            {"analysis_id": self.analysis.id},
+        )
+
+        for dimension, evidence in created_evidence.items():
+            with self.subTest(dimension=dimension):
+                finding = self.finding(output, dimension)
+                self.assertIn(evidence.id, finding.evidence_references)
+                self.assertNotEqual(
+                    finding.evidence_status,
+                    EvidenceStatus.UNAVAILABLE,
+                    f"{dimension} should match its supporting demo evidence",
+                )
+
+
 class LegalAgentTests(AgentTestCase):
     async def test_legal_agent_reports_evidence_without_claiming_compliance(self):
         self.legal_demo_evidence()

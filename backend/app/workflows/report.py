@@ -241,7 +241,12 @@ def generate_report_pdf(
     pdf.set_font("Helvetica", "", 9)
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(0, 5, _pdf_text(report.get("disclaimer", "")))
-    return bytes(pdf.output())
+    pdf_output = pdf.output(dest="S")
+
+    if isinstance(pdf_output, str):
+        return pdf_output.encode("latin-1")
+
+    return bytes(pdf_output)
 
 
 def _pdf_text(value: Any) -> str:
