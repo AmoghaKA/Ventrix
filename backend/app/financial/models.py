@@ -157,3 +157,84 @@ class NormalizedFinancialValue(BaseModel):
     currency_symbol: Optional[str] = None
     original_unit_scale: Optional[str] = None
     normalized_unit: str
+
+
+class CalculationKey(str, Enum):
+    GROSS_PROFIT_MARGIN = "gross_profit_margin"
+    OPERATING_PROFIT_MARGIN = "operating_profit_margin"
+    NET_PROFIT_MARGIN = "net_profit_margin"
+    EBITDA_MARGIN = "ebitda_margin"
+    CURRENT_RATIO = "current_ratio"
+    CASH_RATIO = "cash_ratio"
+    NET_WORKING_CAPITAL = "net_working_capital"
+    DEBT_TO_EQUITY_RATIO = "debt_to_equity_ratio"
+    LIABILITIES_TO_ASSETS_RATIO = "liabilities_to_assets_ratio"
+    OPERATING_CASH_FLOW_MARGIN = "operating_cash_flow_margin"
+    FREE_CASH_FLOW_MARGIN = "free_cash_flow_margin"
+    FREE_CASH_FLOW = "free_cash_flow"
+    ANNUAL_REVENUE_GROWTH = "annual_revenue_growth"
+
+
+class CalculationStatus(str, Enum):
+    CALCULATED = "calculated"
+    UNAVAILABLE = "unavailable"
+    AMBIGUOUS = "ambiguous"
+
+
+class CalculationUnit(str, Enum):
+    PERCENTAGE = "percentage"
+    RATIO = "ratio"
+    CURRENCY_AMOUNT = "currency_amount"
+
+
+class CalculationInput(BaseModel):
+    metric_key: FinancialMetricKey
+    original_metric_label: str
+    original_value: Optional[str] = None
+    normalized_value: Optional[Decimal] = None
+    currency_code: Optional[str] = None
+    currency_symbol: Optional[str] = None
+    original_unit_scale: Optional[str] = None
+    normalized_unit: Optional[str] = None
+    reporting_period_label: Optional[str] = None
+    period_start_date: Optional[date] = None
+    period_end_date: Optional[date] = None
+    fiscal_year: Optional[int] = None
+    fiscal_quarter: Optional[int] = None
+    actuality: Optional[str] = None
+    source_evidence_id: int = Field(gt=0)
+    source_url: str
+    source_title: str = ""
+    supporting_excerpt: str
+    evidence_verification_status: str
+    extraction_status: ExtractionStatus = ExtractionStatus.EXTRACTED
+
+
+class FinancialCalculation(BaseModel):
+    calculation_key: CalculationKey
+    calculation_name: str
+    value: Optional[Decimal] = None
+    unit: CalculationUnit
+    formula: str
+    input_metrics: List[CalculationInput] = Field(default_factory=list)
+    reporting_period_label: Optional[str] = None
+    period_start_date: Optional[date] = None
+    period_end_date: Optional[date] = None
+    fiscal_year: Optional[int] = None
+    fiscal_quarter: Optional[int] = None
+    actuality: Optional[str] = None
+    currency_code: Optional[str] = None
+    currency_symbol: Optional[str] = None
+    source_evidence_ids: List[int] = Field(default_factory=list)
+    source_urls: List[str] = Field(default_factory=list)
+    supporting_excerpts: List[str] = Field(default_factory=list)
+    evidence_verification_status: str = "unavailable"
+    status: CalculationStatus
+    explanation: Optional[str] = None
+    rounding: str = "ROUND_HALF_UP; percentages to 2 decimals, ratios to 4 decimals"
+
+
+class FinancialCalculationResult(BaseModel):
+    calculated: List[FinancialCalculation] = Field(default_factory=list)
+    unavailable: List[FinancialCalculation] = Field(default_factory=list)
+    ambiguous: List[FinancialCalculation] = Field(default_factory=list)
