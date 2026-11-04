@@ -239,6 +239,104 @@ class MarketingAgentTests(AgentTestCase):
             if spec.name == dimension
         )
 
+    def test_competitor_extraction_finds_single_named_competitor(self):
+        evidence = self.add_evidence(
+            title="Competitor research",
+            category="marketing",
+            text="DemoCo competes with FlowTech in workflow automation.",
+        )
+
+        agent = MarketingAgent(self.db)
+        competitors = agent._extract_competitors([evidence])
+
+        self.assertEqual(len(competitors), 1)
+        self.assertEqual(competitors[0]["name"], "FlowTech")
+        self.assertEqual(competitors[0]["evidence_id"], evidence.id)
+        self.assertEqual(
+            competitors[0]["source_title"],
+            evidence.source_title,
+        )
+        self.assertEqual(
+            competitors[0]["source_url"],
+            evidence.source_url,
+        )
+
+    def test_competitor_extraction_finds_multiple_named_competitors(self):
+        evidence = self.add_evidence(
+            title="Competitive landscape",
+            category="marketing",
+            text=(
+                "Competitors include FlowTech, MarketPro and CloudBase "
+                "in the workflow software market."
+            ),
+        )
+
+        agent = MarketingAgent(self.db)
+        competitors = agent._extract_competitors([evidence])
+
+        names = {item["name"] for item in competitors}
+
+        self.assertEqual(
+            names,
+            {"FlowTech", "MarketPro", "CloudBase"},
+        )
+
+    def test_competitor_extraction_removes_duplicate_names(self):
+        first = self.add_evidence(
+            title="Competitor report one",
+            category="marketing",
+            text="DemoCo competes with FlowTech.",
+        )
+        second = self.add_evidence(
+            title="Competitor report two",
+            category="marketing",
+            text="Competitors include FlowTech and MarketPro.",
+        )
+
+        agent = MarketingAgent(self.db)
+        competitors = agent._extract_competitors([first, second])
+
+        flowtech_matches = [
+            item for item in competitors
+            if item["name"].casefold() == "flowtech"
+        ]
+
+        self.assertEqual(len(flowtech_matches), 1)
+        self.assertEqual(
+            flowtech_matches[0]["evidence_id"],
+            first.id,
+        )
+
+    def test_competitor_extraction_ignores_generic_descriptions(self):
+        evidence = self.add_evidence(
+            title="Generic competitive landscape",
+            category="marketing",
+            text=(
+                "DemoCo competes with larger incumbents in a highly "
+                "competitive market."
+            ),
+        )
+
+        agent = MarketingAgent(self.db)
+        competitors = agent._extract_competitors([evidence])
+
+        self.assertEqual(competitors, [])
+
+    def test_competitor_extraction_supports_alternative_names(self):
+        evidence = self.add_evidence(
+            title="Alternative products",
+            category="marketing",
+            text="Alternatives include AlphaSuite and BetaWorks.",
+        )
+
+        agent = MarketingAgent(self.db)
+        competitors = agent._extract_competitors([evidence])
+
+        self.assertEqual(
+            {item["name"] for item in competitors},
+            {"AlphaSuite", "BetaWorks"},
+        )
+
     async def test_marketing_agent_uses_demo_market_evidence(self):
         self.marketing_demo_evidence()
         agent = MarketingAgent(self.db)
@@ -585,3 +683,4 @@ class AgentExecutionTests(AgentTestCase):
                 for ref in legal.evidence_references
             },
         )
+
