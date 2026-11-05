@@ -1,6 +1,7 @@
-
 import re
 from typing import Dict, List, Sequence, Tuple
+
+from app.db.models import Startup
 
 from app.agents.evidence_agent import (
     DimensionSpec,
@@ -151,6 +152,299 @@ class MarketingAgent(EvidenceAgent):
             preferred_categories=("marketing",),
         ),
     )
+
+    async def run(self, startup_id, context=None):
+        """Run market analysis and attach evidence-backed competitor classifications."""
+        output = await super().run(startup_id, context)
+
+        try:
+            if self.db is None or not startup_id:
+                return output
+
+            startup = (
+                self.db.query(Startup)
+                .filter(Startup.id == startup_id)
+                .first()
+            )
+
+            if startup is None:
+                return output
+
+            analysis_id = self._analysis_id(context)
+            evidence = self._load_evidence(startup_id, analysis_id, context)
+            competitors = self._extract_competitors(evidence)
+
+            classifications = [
+                self._classify_competitor(competitor, evidence, startup)
+                for competitor in competitors
+            ]
+
+            if output.detailed_explanations is None:
+                output.detailed_explanations = {}
+
+            if classifications:
+                lines = []
+
+                for item in classifications:
+                    lines.append(
+                        f"{item['name']}: {item['classification']} — "
+                        f"{item['reason']} "
+                        f"(Evidence ID: {item.get('evidence_id')})"
+                    )
+
+                output.detailed_explanations["Competitor classification"] = (
+                    "\n".join(lines)
+                )
+            else:
+                output.detailed_explanations["Competitor classification"] = (
+                    "No explicitly named competitors were identified in the "
+                    "retrieved market evidence."
+                )
+
+        except Exception as exc:
+            self.logger.warning(
+                "Competitor classification could not be added: %s",
+                exc,
+            )
+
+        return output
+
+    def _classify_competitor(
+        self,
+        competitor: Dict,
+        evidence: Sequence,
+        startup,
+    ) -> Dict:
+        """
+        Classify a named competitor using explicit, source-backed signals.
+
+        Direct:
+            The source explicitly describes the company as a direct competitor
+            (or clearly says it competes directly), and the source supports
+            overlap in both product/solution and customer segments.
+
+        Indirect:
+            The source explicitly describes a different/substitute approach
+            that addresses the same customer problem or need.
+
+        Unknown:
+            The available evidence does not establish either relationship.
+        """
+        competitor_name = str(competitor.get("name", "")).strip()
+        evidence_id = competitor.get("evidence_id")
+
+        source = next(
+            (
+                item
+                for item in evidence
+                if self._evidence_value(item, "id") == evidence_id
+            ),
+            None,
+        )
+
+        source_text = self._evidence_text(source) if source is not None else ""
+
+        startup_description = str(
+            self._evidence_value(startup, "description", "") or ""
+        )
+
+        startup_industry = str(
+            self._evidence_value(startup, "industry", "") or ""
+        )
+
+        startup_profile = (
+            f"{startup_description} {startup_industry}"
+        ).casefold()
+
+        if not competitor_name:
+            return {
+                **competitor,
+                "classification": "Unknown",
+                "reason": (
+                    "The competitor name is missing from the extracted evidence."
+                ),
+            }
+
+        # Confirm that the named company actually appears in its cited source.
+        sentences = [
+            sentence.strip()
+            for sentence in re.split(r"(?<=[.!?])\s+|\n+", source_text)
+            if sentence.strip()
+        ]
+
+        competitor_sentences = [
+            sentence
+            for sentence in sentences
+            if re.search(
+                r"(?<!\w)" + re.escape(competitor_name) + r"(?!\w)",
+                sentence,
+                re.IGNORECASE,
+            )
+        ]
+
+        competitor_is_in_source = bool(competitor_sentences)
+
+        competitor_context = " ".join(
+            competitor_sentences
+        ).casefold()
+
+        if not source_text:
+            classification = "Unknown"
+            reason = "The supporting source text is unavailable."
+
+        elif not competitor_is_in_source:
+            classification = "Unknown"
+            reason = (
+                "The cited source does not contain the extracted competitor name, "
+                "so its relationship cannot be verified."
+            )
+
+        else:
+            # These signals must be explicitly present in the source text.
+            direct_signal = any(
+                re.search(pattern, competitor_context)
+                for pattern in (
+                    r"\bdirect competitor\b",
+                    r"\bdirect competition\b",
+                    r"\bcompetes? directly\b",
+                    r"\bcompeting directly\b",
+                    r"\bcompete head[- ]to[- ]head\b",
+                    r"\bsame product category\b",
+                    r"\bsimilar product\b",
+                    r"\bsimilar service\b",
+                    r"\bsimilar solution\b",
+                    r"\bsame product\b",
+                    r"\bsame service\b",
+                    r"\bsame solution\b",
+                )
+            )
+
+            # Remove common words so generic overlap cannot establish a match.
+            stop_words = {
+                "about", "across", "also", "and", "are", "as", "based", "being",
+                "business", "businesses", "company", "companies", "customer",
+                "customers", "for", "from", "has", "have", "into", "its", "more",
+                "offers", "provides", "serves", "solution", "solutions", "that",
+                "their", "them", "these", "this", "those", "through", "to", "use",
+                "using", "with", "within", "the", "they", "which", "will",
+                "would", "can", "could", "but", "not",
+            }
+
+            def meaningful_terms(value: str) -> set:
+                return {
+                    token
+                    for token in re.findall(r"[a-z0-9]+", value.casefold())
+                    if len(token) > 2 and token not in stop_words
+                }
+
+            # Compare the startup's description and industry with the cited source.
+            startup_terms = meaningful_terms(startup_profile)
+            source_terms = meaningful_terms(competitor_context)
+            shared_terms = startup_terms & source_terms
+
+            product_terms = {
+                "software", "automation", "workflow", "analytics", "crm",
+                "payments", "accounting", "marketplace", "security", "cloud",
+                "database", "recruitment", "logistics", "fintech", "saas",
+                "platform", "application", "app", "tool", "service",
+                "healthcare", "education", "ecommerce", "commerce", "banking",
+                "insurance", "manufacturing", "communication", "marketing",
+                "sales", "human", "resources", "cybersecurity",
+            }
+
+            customer_terms = {
+                "enterprise", "smb", "startup", "startups", "mid", "market",
+                "finance", "financial", "teams", "team", "retail", "healthcare",
+                "consumers", "developers", "manufacturers", "schools", "banks",
+                "individuals", "students", "patients", "doctors", "employees",
+                "recruiters", "merchants", "small", "medium", "large",
+                "organizations", "professionals",
+            }
+
+            product_overlap = shared_terms & product_terms
+            customer_overlap = shared_terms & customer_terms
+
+            if direct_signal and product_overlap and customer_overlap:
+                classification = "Direct"
+                reason = (
+                    "The cited source explicitly indicates direct competition, "
+                    "and it supports overlap with the startup in both product/"
+                    "industry and target-customer terms."
+                )
+
+            else:
+                indirect_signal = any(
+                    re.search(pattern, competitor_context)
+                    for pattern in (
+                        r"\bindirect competitor\b",
+                        r"\bindirect competition\b",
+                        r"\bsubstitute solution\b",
+                        r"\balternative approach\b",
+                        r"\bdifferent approach\b",
+                        r"\bdifferent product\b",
+                        r"\bother way to\b",
+                        r"\bsubstitute for\b",
+                        r"\balternative to\b",
+                    )
+                )
+
+                same_problem_signal = any(
+                    re.search(pattern, competitor_context)
+                    for pattern in (
+                        r"\bsame problem\b",
+                        r"\bsame need\b",
+                        r"\bsame customer problem\b",
+                        r"\bsolves? the same problem\b",
+                        r"\bsolves? the problem\b",
+                        r"\baddresses? the same need\b",
+                        r"\bserves? the same need\b",
+                        r"\baddresses? the same problem\b",
+                    )
+                )
+
+                if indirect_signal and same_problem_signal:
+                    classification = "Indirect"
+                    reason = (
+                        "The cited source connects this named company to a "
+                        "different or substitute approach that addresses the "
+                        "same customer problem or need."
+                    )
+
+                else:
+                    classification = "Unknown"
+
+                    if not startup_profile.strip():
+                        reason = (
+                            "The startup description and industry are missing, "
+                            "so product and customer overlap cannot be assessed."
+                        )
+
+                    elif not direct_signal and not indirect_signal:
+                        reason = (
+                            "The cited source names the company but does not "
+                            "explicitly establish whether it is a direct or "
+                            "indirect competitor."
+                        )
+
+                    elif direct_signal:
+                        reason = (
+                            "The source indicates direct competition, but it "
+                            "does not establish both product/industry overlap "
+                            "and target-customer overlap."
+                        )
+
+                    else:
+                        reason = (
+                            "The source suggests an alternative approach but "
+                            "does not clearly establish that it addresses the "
+                            "same customer problem or need."
+                        )
+
+        return {
+            **competitor,
+            "classification": classification,
+            "reason": reason,
+        }
 
     def _match_dimension(
         self,
