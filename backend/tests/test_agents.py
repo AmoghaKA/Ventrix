@@ -195,7 +195,6 @@ class AgentTestCase(unittest.IsolatedAsyncioTestCase):
         )
 
 
-
 class FinancialAgentTests(AgentTestCase):
 
     async def test_financial_agent_preserves_deterministic_financial_data_without_llm(self):
@@ -227,7 +226,6 @@ class FinancialAgentTests(AgentTestCase):
             output.detailed_explanations,
         )
         self.assertTrue(evidence)
-
 
 
 class MarketingAgentTests(AgentTestCase):
@@ -336,6 +334,76 @@ class MarketingAgentTests(AgentTestCase):
             {item["name"] for item in competitors},
             {"AlphaSuite", "BetaWorks"},
         )
+
+    def test_competitor_classification_identifies_direct_competitor(self):
+        self.startup.description = (
+            "Workflow automation software for mid-market finance teams."
+        )
+
+        evidence = self.add_evidence(
+            title="Direct competitor research",
+            category="marketing",
+            text=(
+                "Competitors include FlowTech. FlowTech is a direct competitor "
+                "providing workflow automation software for mid-market finance teams."
+            ),
+        )
+
+        agent = MarketingAgent(self.db)
+        competitors = agent._extract_competitors([evidence])
+
+        self.assertEqual(len(competitors), 1)
+
+        result = agent._classify_competitor(
+            competitors[0], [evidence], self.startup
+        )
+
+        self.assertEqual(result["classification"], "Direct")
+        self.assertIn("direct competition", result["reason"].lower())
+
+    def test_competitor_classification_identifies_indirect_competitor(self):
+        evidence = self.add_evidence(
+            title="Indirect competitor research",
+            category="marketing",
+            text=(
+                "Alternatives include SheetWorks. SheetWorks provides "
+                "spreadsheet-based tools as an alternative approach addressing "
+                "the same problem for mid-market finance teams."
+            ),
+        )
+
+        agent = MarketingAgent(self.db)
+        competitors = agent._extract_competitors([evidence])
+
+        self.assertEqual(len(competitors), 1)
+
+        result = agent._classify_competitor(
+            competitors[0], [evidence], self.startup
+        )
+
+        self.assertEqual(result["classification"], "Indirect")
+        self.assertIn("same customer problem", result["reason"].lower())
+
+    def test_competitor_classification_returns_unknown_without_relationship_evidence(self):
+        evidence = self.add_evidence(
+            title="Competitor mention without classification",
+            category="marketing",
+            text=(
+                "Competitors include FlowTech in the workflow software market."
+            ),
+        )
+
+        agent = MarketingAgent(self.db)
+        competitors = agent._extract_competitors([evidence])
+
+        self.assertEqual(len(competitors), 1)
+
+        result = agent._classify_competitor(
+            competitors[0], [evidence], self.startup
+        )
+
+        self.assertEqual(result["classification"], "Unknown")
+        self.assertTrue(result["reason"])
 
     async def test_marketing_agent_uses_demo_market_evidence(self):
         self.marketing_demo_evidence()
@@ -489,8 +557,6 @@ class MarketingAgentTests(AgentTestCase):
 
         self.assertEqual(len(matches), 5)
 
-
-
     async def test_marketing_agent_matches_expanded_market_intelligence_keywords(self):
         evidence_items = [
             (
@@ -526,6 +592,7 @@ class MarketingAgentTests(AgentTestCase):
         ]
 
         created_evidence = {}
+
         for title, text, dimension in evidence_items:
             created_evidence[dimension] = self.add_evidence(
                 title=title,
@@ -683,4 +750,3 @@ class AgentExecutionTests(AgentTestCase):
                 for ref in legal.evidence_references
             },
         )
-
