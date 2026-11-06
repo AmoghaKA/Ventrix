@@ -131,6 +131,7 @@ def generate_final_report(
             len(outputs),
             failed_agents,
             all_findings,
+            missing_information,
         ),
         "executive_summary_section": sections[0],
         "company_profile": sections[1]["profile"],
@@ -367,6 +368,9 @@ def _all_findings(outputs: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
             item = dict(finding)
             item["agent_key"] = agent_key
             item["agent_name"] = output.get("agent_name", _AGENT_NAMES.get(agent_key))
+            item["summary"] = _truncate(item.get("summary"), 120)
+            item["explanation"] = _truncate(item.get("explanation"), 220)
+            item["investor_impact"] = _truncate(item.get("investor_impact"), 150)
             findings.append(item)
     return findings
 
@@ -477,6 +481,7 @@ def _executive_summary_text(
     output_count: int,
     failed_agents: List[str],
     all_findings: List[Dict[str, Any]],
+    missing_information: List[str],
 ) -> str:
     high_risk = [
         finding.get("dimension", "Unknown")
@@ -484,25 +489,21 @@ def _executive_summary_text(
         if str(finding.get("risk_level", "")).upper() in {"HIGH", "CRITICAL"}
     ]
     summary = (
-        f"{name} was assessed using {output_count} specialist agent report(s) and "
-        f"cross-checked against stored public evidence. The aggregate risk level is "
-        f"{overall_risk.lower()} and the verification status is "
-        f"{verification_status.lower().replace('_', ' ')}."
+        f"{name} was reviewed using {output_count} specialist report(s). "
+        f"Overall risk: {overall_risk.lower()}. "
+        f"Verification: {verification_status.lower().replace('_', ' ')}. "
+        f"Missing information items: {len(missing_information)}."
     )
     if high_risk:
         summary += (
-            " Material risk signals were identified in: "
-            + ", ".join(sorted(set(high_risk)))
-            + "."
+            " Key risk areas: " + ", ".join(sorted(set(high_risk))) + "."
         )
     if failed_agents:
         summary += (
-            " The following specialist agents failed and are excluded from completed "
-            "findings: " + ", ".join(failed_agents) + "."
+            " Failed agents: " + ", ".join(failed_agents) + "."
         )
     summary += (
-        " This report does not constitute independent verification, legal advice, "
-        "an audit, or an investment recommendation."
+        " This is not an investment recommendation."
     )
     return summary
 
@@ -729,18 +730,31 @@ def _specialist_section(
         )
 
     section = _section_base(title, content)
-    section["findings"] = [
-        {
-            "dimension": finding.get("dimension"),
-            "summary": finding.get("summary"),
-            "explanation": finding.get("explanation"),
-            "risk_level": finding.get("risk_level"),
-            "evidence_status": finding.get("evidence_status"),
-            "investor_impact": finding.get("investor_impact"),
-            "evidence_references": finding.get("evidence_references", []),
-        }
-        for finding in findings
-    ]
+    simplified_findings = []
+    for finding in findings:
+        if str(finding.get("evidence_status", "")).upper() == "UNAVAILABLE":
+            summary = "No public evidence was found for this area."
+            explanation = (
+                "The retrieved public sources do not support this dimension. "
+                "This is an information gap, not proof that the risk is absent."
+            )
+            investor_impact = "Request supporting documents before relying on this area."
+        else:
+            summary = _truncate(finding.get("summary"), 120)
+            explanation = _truncate(finding.get("explanation"), 220)
+            investor_impact = _truncate(finding.get("investor_impact"), 150)
+        simplified_findings.append(
+            {
+                "dimension": finding.get("dimension"),
+                "summary": summary,
+                "explanation": explanation,
+                "risk_level": finding.get("risk_level"),
+                "evidence_status": finding.get("evidence_status"),
+                "investor_impact": investor_impact,
+                "evidence_references": finding.get("evidence_references", []),
+            }
+        )
+    section["findings"] = simplified_findings
     section["evidence_references"] = [
         reference
         for reference in (output.get("evidence_references", []) if isinstance(output, dict) else [])
