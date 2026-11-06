@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from app.core.config import settings
 from app.llm.providers.base import BaseLLMProvider, LLMProviderError
 from app.llm.providers.gemini import GeminiProvider
+from app.llm.providers.groq import GroqProvider
 from app.llm.providers.mistral import MistralProvider
 from app.llm.providers.mock import MockProvider
 from app.llm.providers.nvidia import NvidiaProvider
@@ -71,10 +72,12 @@ class LLMGateway:
                 GeminiProvider(timeout_seconds=self.timeout_seconds),
                 NvidiaProvider(timeout_seconds=self.timeout_seconds),
                 MistralProvider(timeout_seconds=self.timeout_seconds),
+                GroqProvider(timeout_seconds=self.timeout_seconds),
             ]
             providers[0].priority = 1
             providers[1].priority = 2
             providers[2].priority = 3
+            providers[3].priority = 4
 
         self._providers = sorted(providers, key=lambda p: getattr(p, "priority", 0))
         if self.mock_mode:
