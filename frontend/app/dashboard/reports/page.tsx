@@ -27,7 +27,44 @@ type Report = Record<string, unknown>;
 
 function text(value: unknown): string {
   if (value == null) return "";
-  return typeof value === "string" ? value : String(value);
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => text(item)).filter(Boolean).join(", ");
+  }
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const preferredKeys = [
+      "summary",
+      "question",
+      "reason",
+      "reasoning",
+      "message",
+      "text",
+      "title",
+      "label",
+      "dimension",
+      "investor_impact",
+      "status",
+      "value",
+      "name",
+      "id",
+    ];
+    for (const key of preferredKeys) {
+      const candidate = record[key];
+      if (candidate != null && typeof candidate !== "object") {
+        return String(candidate);
+      }
+    }
+    try {
+      return JSON.stringify(record);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
 }
 
 function asArray(value: unknown): unknown[] {
@@ -541,7 +578,7 @@ export default function InvestorReportsPage() {
                     <table className="min-w-full border-collapse text-xs">
                       <thead>
                         <tr className="border-b border-slate-200 bg-slate-50/70">
-                          {["Evidence", "Status", "Reliability", "Score"].map((heading) => (
+                          {["Evidence ID", "Verification", "Reliability", "Score"].map((heading) => (
                             <th key={heading} className="px-3 py-2 text-left font-semibold text-slate-600">
                               {heading}
                             </th>
@@ -551,10 +588,10 @@ export default function InvestorReportsPage() {
                       <tbody>
                         {reliability.map((item, index) => (
                           <tr key={index} className="border-b border-slate-100 last:border-0">
-                            <td className="px-3 py-2 text-slate-700">{text(item.id)}</td>
-                            <td className="px-3 py-2 text-slate-600">{text(item.status)}</td>
-                            <td className="px-3 py-2 text-slate-600">{text(item.reliability)}</td>
-                            <td className="px-3 py-2 text-slate-600">{text(item.score)}</td>
+                            <td className="px-3 py-2 text-slate-700">{text(item.evidence_id ?? item.id)}</td>
+                            <td className="px-3 py-2 text-slate-600">{text(item.verification_status ?? item.status)}</td>
+                            <td className="px-3 py-2 text-slate-600">{text(item.reliability_level ?? item.reliability)}</td>
+                            <td className="px-3 py-2 text-slate-600">{text(item.reliability_score ?? item.score)}</td>
                           </tr>
                         ))}
                       </tbody>
