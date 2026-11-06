@@ -3,6 +3,7 @@ import logging
 import uuid
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
+from app.agents.base import BaseAgent
 from app.llm.gateway import llm_gateway
 from app.schemas.controller import (
     AgentResult,
@@ -20,7 +21,7 @@ StatusUpdater = Callable[[str, str], Awaitable[None]]
 RunCreator = Callable[[StartupInput], Awaitable[str]]
 
 
-class ControllerAgent:
+class ControllerAgent(BaseAgent):
     def __init__(
         self,
         *,
@@ -30,6 +31,7 @@ class ControllerAgent:
         run_creator: Optional[RunCreator] = None,
         llm_gateway_instance=llm_gateway,
     ) -> None:
+        super().__init__("Controller Agent")
         self.specialist_agents = specialist_agents or {}
         self.verification_agent = verification_agent
         self.status_updater = status_updater
@@ -76,7 +78,36 @@ class ControllerAgent:
                 error=str(exc),
             )
 
-    async def run(self, startup: StartupInput, analysis_id: Optional[str] = None) -> ControllerResponse:
+    async def run(
+        self,
+        startup_or_startup_id: Any,
+        analysis_id: Optional[Any] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> ControllerResponse:
+        if isinstance(startup_or_startup_id, int):
+            if isinstance(analysis_id, dict) and context is None:
+                context = analysis_id
+                analysis_id = None
+            context = context or {}
+            startup = context.get("startup")
+            if startup is None:
+                startup = StartupInput.model_construct(
+                    startup_name="",
+                    website="",
+                )
+            resolved_analysis_id = analysis_id or context.get("analysis_id")
+            return await self._run_workflow(startup, resolved_analysis_id)
+
+        if isinstance(analysis_id, dict) and context is None:
+            context = analysis_id
+            analysis_id = None
+        return await self._run_workflow(startup_or_startup_id, analysis_id)
+
+    async def _run_workflow(
+        self,
+        startup: Any,
+        analysis_id: Optional[str] = None,
+    ) -> ControllerResponse:
         try:
             startup = StartupInput.model_validate(startup)
         except Exception as exc:  # noqa: BLE001
@@ -130,8 +161,11 @@ class ControllerAgent:
 
         assessment = await self._assess(startup, consolidated, errors)
 
-        final_status = "completed" if not errors else "completed"
         if not agent_results and not verification_result:
+            final_status = "completed"
+        elif agent_results and all(result.status == "failed" for result in agent_results):
+            final_status = "failed"
+        else:
             final_status = "completed"
 
         await self._update_status(analysis_id, final_status)

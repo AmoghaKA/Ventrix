@@ -508,6 +508,8 @@ def download_analysis_report_pdf_alias(
 def system_status(db: Session = Depends(get_db)):
     from app.core.config import settings
 
+    from app.llm.gateway import llm_gateway
+
     analysis_count = db.query(Analysis).count()
     providers = []
     for name, env_name in (
@@ -536,10 +538,10 @@ def system_status(db: Session = Depends(get_db)):
         "api_status": "healthy",
         "database": "connected",
         "analysis_count": analysis_count,
-        "max_analyses": 10,
+        "max_analyses": settings.MAX_ANALYSES,
         "providers": providers,
         "active_provider": active,
-        "fallback_history": [],
+        "fallback_history": llm_gateway.fallback_history(),
         "version": "1.0.0",
     }
 
@@ -599,6 +601,11 @@ async def run_agent(
     db: Session = Depends(get_db),
 ):
     result = await _run_agents(db, analysis_id, [agent_key])
+    if not result.outputs:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Agent did not return an output.",
+        )
     return result.outputs[0]
 
 
