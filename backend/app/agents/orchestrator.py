@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple, Type
 
@@ -113,14 +114,16 @@ class AgentOrchestrator:
         startup = self._startup(analysis)
         definitions = self._definitions(agent_keys)
 
-        outputs: List[AgentOutput] = []
-        for definition in definitions:
+        async def _run_one(definition: AgentDefinition) -> AgentOutput:
             agent = definition.agent_class(self.db)
-            output = await agent.execute(
+            return await agent.execute(
                 startup.id,
                 {"analysis_id": analysis.id},
             )
-            outputs.append(output)
+
+        outputs = list(
+            await asyncio.gather(*(_run_one(definition) for definition in definitions))
+        )
 
         return AgentRunResult(
             analysis_id=analysis.id,

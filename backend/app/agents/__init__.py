@@ -1,5 +1,6 @@
 from app.agents.base import BaseAgent
 from app.agents.controller import ControllerAgent
+from app.agents.controller_agent import ControllerAgent as InMemoryControllerAgent
 from app.agents.evidence_agent import DimensionSpec, EvidenceAgent
 from app.agents.financial import FinancialAgent
 from app.agents.legal import LegalAgent
@@ -45,6 +46,7 @@ __all__ = [
     "AnalysisNotFoundError",
     "BaseAgent",
     "ControllerAgent",
+    "InMemoryControllerAgent",
     "DimensionSpec",
     "EvidenceAgent",
     "EvidenceReference",
