@@ -27,7 +27,59 @@ type Report = Record<string, unknown>;
 
 function text(value: unknown): string {
   if (value == null) return "";
-  return typeof value === "string" ? value : String(value);
+  if (typeof value === "string") {
+    return normalizeText(value);
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(text).filter(Boolean).join(", ");
+  }
+  if (typeof value === "object") {
+    const candidate = [
+      "summary",
+      "title",
+      "name",
+      "label",
+      "value",
+      "message",
+      "reason",
+      "status",
+      "dimension",
+      "question",
+    ]
+      .map((key) => text((value as Record<string, unknown>)[key]))
+      .find(Boolean);
+    if (candidate) return candidate;
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return "";
+    }
+  }
+  return String(value);
+}
+
+function normalizeText(value: string): string {
+  const trimmed = value.replace(/\s+/g, " ").trim();
+  if (!trimmed) return "";
+  if (/^[A-Za-z]+(?:_[A-Za-z]+)+$/.test(trimmed)) {
+    return trimmed
+      .split("_")
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(" ");
+  }
+  if (/^[A-Z][A-Z\s/()-]+$/.test(trimmed)) {
+    return trimmed
+      .toLowerCase()
+      .split(" ")
+      .filter(Boolean)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  }
+  return trimmed;
 }
 
 function asArray(value: unknown): unknown[] {
@@ -479,7 +531,7 @@ export default function InvestorReportsPage() {
                                     {asArray(row).map((cell, cellIndex) => (
                                       <td
                                         key={cellIndex}
-                                        className="px-3 py-2 text-slate-600"
+                                         className="px-3 py-2 break-words align-top text-slate-600"
                                       >
                                         {text(cell)}
                                       </td>
@@ -551,10 +603,10 @@ export default function InvestorReportsPage() {
                       <tbody>
                         {reliability.map((item, index) => (
                           <tr key={index} className="border-b border-slate-100 last:border-0">
-                            <td className="px-3 py-2 text-slate-700">{text(item.id)}</td>
-                            <td className="px-3 py-2 text-slate-600">{text(item.status)}</td>
-                            <td className="px-3 py-2 text-slate-600">{text(item.reliability)}</td>
-                            <td className="px-3 py-2 text-slate-600">{text(item.score)}</td>
+                            <td className="px-3 py-2 break-words align-top text-slate-700">{text(item.id)}</td>
+                            <td className="px-3 py-2 break-words align-top text-slate-600">{text(item.status)}</td>
+                            <td className="px-3 py-2 break-words align-top text-slate-600">{text(item.reliability)}</td>
+                            <td className="px-3 py-2 break-words align-top text-slate-600">{text(item.score)}</td>
                           </tr>
                         ))}
                       </tbody>
