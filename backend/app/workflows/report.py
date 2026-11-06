@@ -354,7 +354,8 @@ def _missing_information(
                 if item not in seen:
                     seen.add(item)
                     missing.append(item)
-    return missing
+    # Keep the report concise and readable for end users.
+    return missing[:15]
 
 
 def _all_findings(outputs: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -1020,6 +1021,9 @@ def _investor_questions_section(
 
     if not questions:
         add("What additional diligence materials can the company provide for standard verification?")
+
+    # Keep the question list concise and user-friendly.
+    questions = questions[:12]
 
     content = [
         "The following questions are derived from identified risks, gaps, and "
