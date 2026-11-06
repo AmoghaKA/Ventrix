@@ -13,10 +13,12 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     NVIDIA_API_KEY: str = ""
     MISTRAL_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
 
     GEMINI_MODEL: str = "gemini-1.5-flash"
     NVIDIA_MODEL: str = "nvidia/nemotron-70b-instruct"
     MISTRAL_MODEL: str = "mistral-large-latest"
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
     LLM_TIMEOUT_SECONDS: float = 30.0
     LLM_MOCK_MODE: bool = True
 

@@ -516,6 +516,7 @@ def system_status(db: Session = Depends(get_db)):
         ("Gemini", "GEMINI_API_KEY"),
         ("NVIDIA Nemotron", "NVIDIA_API_KEY"),
         ("Mistral", "MISTRAL_API_KEY"),
+        ("Groq", "GROQ_API_KEY"),
     ):
         import os
 
