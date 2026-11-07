@@ -179,6 +179,7 @@ export default function InvestorReportsPage() {
   const charts = asArray(report?.charts) as Record<string, unknown>[];
   const findings = asArray(report?.all_findings) as Record<string, unknown>[];
   const missing = asArray(report?.missing_information).map(text);
+  const evidenceReferences = asArray(report?.evidence_references) as Record<string, unknown>[];
   const questions = asArray(report?.investor_questions).map(text);
   const reliability = asArray(report?.source_reliability) as Record<string, unknown>[];
   const assessment = (report?.controller_assessment ?? null) as Record<string, unknown> | null;
@@ -370,6 +371,41 @@ export default function InvestorReportsPage() {
                       <p key={pIndex} className="text-sm leading-relaxed text-slate-600">
                         {text(paragraph)}
                       </p>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {evidenceReferences.length > 0 && (
+                <Card className="p-6">
+                  <h3 className="text-base font-semibold text-slate-900">
+                    Evidence and sources
+                  </h3>
+                  <div className="mt-3 space-y-2">
+                    {evidenceReferences.map((reference, index) => (
+                      <div
+                        key={index}
+                        className="rounded-xl border border-slate-200/70 bg-slate-50/70 p-3 text-xs text-slate-600"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-semibold text-slate-800">
+                            {text(reference.source_title) || `Evidence ${text(reference.evidence_id)}`}
+                          </span>
+                          <span className="uppercase tracking-wider text-slate-400">
+                            {text(reference.verification_status)}
+                          </span>
+                        </div>
+                        {reference.source_url ? (
+                          <a
+                            href={text(reference.source_url)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 block break-all text-blue-600 underline"
+                          >
+                            {text(reference.source_url)}
+                          </a>
+                        ) : null}
+                      </div>
                     ))}
                   </div>
                 </Card>

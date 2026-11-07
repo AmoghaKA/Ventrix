@@ -1,8 +1,10 @@
 from pydantic import BaseModel, Field, HttpUrl
 from datetime import datetime
 from typing import Optional, List, Dict, Any
+from uuid import uuid4
 
-from app.agents.output import AgentOutput
+from app.agents.output import AgentOutput, AgentFinding, RiskLevel, EvidenceStatus, ExecutionStatus, AssessmentStatus
+from app.schemas.controller import StartupInput
 
 
 class StartupBase(BaseModel):
@@ -219,3 +221,60 @@ class HealthCheck(BaseModel):
     database: str
 
 from app.agents.verification import VerificationOutput as VerificationOut
+
+
+class EvidenceItem(BaseModel):
+    """Shared representation of a stored or retrieved evidence record."""
+
+    evidence_id: Optional[int] = Field(default=None, alias="id")
+    id: Optional[int] = None
+    startup_id: Optional[int] = None
+    analysis_id: Optional[int] = None
+    source_url: Optional[str] = None
+    source_title: Optional[str] = None
+    source_category: Optional[str] = None
+    extracted_information: Optional[str] = None
+    raw_text: Optional[str] = None
+    publication_date: Optional[datetime] = None
+    retrieval_date: Optional[datetime] = None
+    verification_status: Optional[str] = None
+    related_agent: Optional[str] = None
+    findings: List[Dict[str, Any]] = Field(default_factory=list)
+    source_metadata: Dict[str, Any] = Field(default_factory=dict)
+    content_hash: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        populate_by_name = True
+        from_attributes = True
+
+
+class FinalDueDiligenceReport(BaseModel):
+    """Shared top-level report schema used by workflow and API responses."""
+
+    title: Optional[str] = None
+    generated_at: Optional[str] = None
+    report_id: Optional[int] = None
+    analysis_id: Optional[int] = None
+    workflow_id: Optional[int] = None
+    startup_id: Optional[int] = None
+    company: Dict[str, Any] = Field(default_factory=dict)
+    overall_risk: Optional[str] = None
+    overall_assessment: Optional[str] = None
+    final_assessment_category: Optional[str] = None
+    evidence_status: Optional[str] = None
+    verification_status: Optional[str] = None
+    recommendation: Optional[str] = None
+    executive_summary: Optional[str] = None
+    sections: List[Dict[str, Any]] = Field(default_factory=list)
+    charts: List[Dict[str, Any]] = Field(default_factory=list)
+    disclaimer: Optional[str] = None
+    missing_information: List[str] = Field(default_factory=list)
+    contradictions: List[Any] = Field(default_factory=list)
+    source_reliability: List[Any] = Field(default_factory=list)
+    evidence_references: List[Any] = Field(default_factory=list)
+    controller_assessment: Optional[Dict[str, Any]] = None
+
+    class Config:
+        from_attributes = True

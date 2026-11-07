@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from urllib.parse import urlsplit, urlunsplit
 
@@ -181,7 +181,7 @@ class EvidenceStore:
                 existing.extracted_information = extracted.extracted_information
                 existing.raw_text = extracted.raw_text
                 existing.publication_date = extracted.publication_date
-                existing.retrieval_date = datetime.utcnow()
+                existing.retrieval_date = datetime.now(timezone.utc).replace(tzinfo=None)
                 existing.related_agent = extracted.related_agent
                 existing.findings = extracted.findings
                 existing.source_metadata = extracted.source_metadata

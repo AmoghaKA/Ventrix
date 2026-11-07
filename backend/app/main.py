@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -15,10 +17,18 @@ from app.api.frontend_compat import router as frontend_router
 
 setup_logging()
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     debug=settings.DEBUG,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -34,11 +44,6 @@ app.include_router(usage_router, prefix="/api")
 app.include_router(usage_router, prefix="/api/v1")
 app.include_router(frontend_router, prefix="/api")
 app.include_router(frontend_router, prefix="/api/v1")
-
-
-@app.on_event("startup")
-async def on_startup():
-    init_db()
 
 
 @app.get("/health", response_model=HealthCheck, tags=["health"])

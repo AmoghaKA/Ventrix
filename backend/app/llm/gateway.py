@@ -191,6 +191,9 @@ class LLMGateway:
 
     def _next_provider_name(self, index: int) -> Optional[str]:
         for provider in self._providers[index + 1 :]:
+            if getattr(provider, "configured", False):
+                return getattr(provider, "name", None)
+        for provider in self._providers[index + 1 :]:
             return getattr(provider, "name", None)
         return None
 

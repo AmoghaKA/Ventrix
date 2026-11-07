@@ -512,15 +512,13 @@ def system_status(db: Session = Depends(get_db)):
 
     analysis_count = db.query(Analysis).count()
     providers = []
-    for name, env_name in (
-        ("Gemini", "GEMINI_API_KEY"),
-        ("NVIDIA Nemotron", "NVIDIA_API_KEY"),
-        ("Mistral", "MISTRAL_API_KEY"),
-        ("Groq", "GROQ_API_KEY"),
+    for name, value in (
+        ("Gemini", settings.GEMINI_API_KEY),
+        ("NVIDIA Nemotron", settings.NVIDIA_API_KEY),
+        ("Mistral", settings.MISTRAL_API_KEY),
+        ("Groq", settings.GROQ_API_KEY),
     ):
-        import os
-
-        configured = bool(os.getenv(env_name))
+        configured = bool(value)
         providers.append(
             {
                 "name": name,

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from sqlalchemy.orm import Session
@@ -28,7 +28,7 @@ class Cache:
         if entry is None:
             return None
 
-        if entry.expires_at <= datetime.utcnow():
+        if entry.expires_at <= datetime.now(timezone.utc).replace(tzinfo=None):
             self.db.delete(entry)
             self.db.commit()
             return None
@@ -46,7 +46,7 @@ class Cache:
         error: Optional[str] = None,
         extra: Optional[dict[str, Any]] = None,
     ) -> RetrievalCacheEntry:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         is_error = bool(error) or (status_code is not None and status_code >= 400)
         ttl = self.error_ttl if is_error else self.success_ttl
 

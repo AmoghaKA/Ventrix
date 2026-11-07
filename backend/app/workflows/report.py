@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fpdf import FPDF
@@ -54,47 +54,51 @@ def generate_final_report(
     contradictions = _contradictions(verification)
     source_reliability = _source_reliability(verification)
 
+    final_category = _final_category(
+        overall_risk,
+        verification_status,
+        failed_agents,
+        contradictions,
+        missing_information,
+        all_findings,
+    )
+
     sections = [
         _executive_section(
             analysis, overall_risk, verification_status, outputs, failed_agents, all_findings
         ),
-        _company_profile_section(analysis, startup, outputs),
-        _investment_opportunity_section(analysis, outputs, overall_risk),
-        _specialist_section(
-            "Financial Due Diligence",
-            "financial",
-            outputs,
-            "Financial findings are limited to retrieved public evidence and are not audited financial statements.",
+        _action_section(
+            analysis, overall_risk, missing_information, all_findings, contradictions, verification_status
         ),
-        _specialist_section(
-            "Market and Marketing Analysis",
-            "marketing",
-            outputs,
-            "Market evidence is limited to retrieved public sources and has not been independently validated.",
-        ),
-        _specialist_section(
-            "Legal and Compliance Analysis",
-            "legal",
-            outputs,
-            "Public legal statements are not independent proof of compliance or legal status.",
-        ),
-        _risk_section(overall_risk, all_findings, outputs, aggregation),
-        _verification_section(verification, verification_status, contradictions, source_reliability),
-        _information_gaps_section(missing_information, all_findings, failed_agents),
-        _investor_questions_section(missing_information, all_findings, contradictions, verification_status),
-        _investment_considerations_section(overall_risk, verification_status, missing_information, contradictions),
-        _final_assessment_section(
-            overall_risk,
-            verification_status,
-            failed_agents,
-            contradictions,
-            missing_information,
-            all_findings,
+        _scorecard_section(outputs, verification, source_reliability, overall_risk),
+        _positives_section(all_findings, outputs),
+        _risks_section(all_findings, outputs),
+        _agent_analysis_section(analysis, outputs, verification, all_findings),
+        _missing_section(missing_information, all_findings, failed_agents),
+        _evidence_section(evidence_references, verification),
+        _final_guidance_section(
+            analysis, overall_risk, verification_status, final_category, missing_information, all_findings
         ),
     ]
 
-    final_category = sections[-1]["final_assessment_category"]
-    generated_at = datetime.utcnow().isoformat() + "Z"
+    generated_at = datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z"
+
+    key_positive_indicators = sorted(
+        {
+            finding.get("dimension")
+            for finding in all_findings
+            if str(finding.get("risk_level", "")).upper() == "LOW"
+            and finding.get("dimension")
+        }
+    )
+    major_concerns = sorted(
+        {
+            finding.get("dimension")
+            for finding in all_findings
+            if str(finding.get("risk_level", "")).upper() in {"HIGH", "CRITICAL"}
+            and finding.get("dimension")
+        }
+    )
 
     return {
         "title": f"{analysis.startup_name} Investor Due Diligence Report",
@@ -124,6 +128,8 @@ def generate_final_report(
         ),
         "verification_status": verification_status,
         "recommendation": _recommendation(overall_risk, final_category),
+        "key_positive_indicators": key_positive_indicators,
+        "major_concerns": major_concerns,
         "executive_summary": _executive_summary_text(
             analysis.startup_name,
             overall_risk,
@@ -131,19 +137,32 @@ def generate_final_report(
             len(outputs),
             failed_agents,
             all_findings,
+            missing_information,
         ),
         "executive_summary_section": sections[0],
-        "company_profile": sections[1]["profile"],
-        "investment_opportunity": sections[2],
-        "financial_due_diligence": sections[3],
-        "market_analysis": sections[4],
+        "company_profile": {
+            "analysis_id": analysis.id,
+            "startup_id": startup.id,
+            "name": analysis.startup_name,
+            "website": analysis.website,
+            "industry": analysis.industry or "Not provided",
+            "country": analysis.country or "Not provided",
+            "additional_information": analysis.additional_information or "Not provided",
+            "analysis_status": analysis.status,
+            "overall_assessment": analysis.overall_assessment,
+        },
+        "investment_opportunity": sections[1],
+        "financial_due_diligence": sections[5],
+        "market_analysis": sections[5],
         "legal_analysis": sections[5],
-        "risk_assessment": sections[6],
+        "risk_assessment": sections[4],
         "verification": sections[7],
-        "information_gaps": sections[8],
-        "investor_questions": sections[9]["questions"],
-        "investment_considerations": sections[10]["considerations"],
-        "final_assessment": sections[11],
+        "information_gaps": sections[6],
+        "investor_questions": _investor_questions_section(
+            missing_information, all_findings, contradictions, verification_status
+        )["questions"],
+        "investment_considerations": sections[1],
+        "final_assessment": sections[-1],
         "specialist_reports": _specialist_reports(outputs),
         "verification_summary": _verification_summary(verification),
         "failed_agents": failed_agents,
@@ -241,7 +260,7 @@ def generate_report_pdf(
     pdf.set_font("Helvetica", "", 9)
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(0, 5, _pdf_text(report.get("disclaimer", "")))
-    pdf_output = pdf.output(dest="S")
+    pdf_output = pdf.output()
 
     if isinstance(pdf_output, str):
         return pdf_output.encode("latin-1")
@@ -367,6 +386,9 @@ def _all_findings(outputs: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
             item = dict(finding)
             item["agent_key"] = agent_key
             item["agent_name"] = output.get("agent_name", _AGENT_NAMES.get(agent_key))
+            item["summary"] = _truncate(item.get("summary"), 90)
+            item["explanation"] = _truncate(item.get("explanation"), 150)
+            item["investor_impact"] = _truncate(item.get("investor_impact"), 110)
             findings.append(item)
     return findings
 
@@ -416,30 +438,22 @@ def _assessment(overall_risk: str) -> str:
         "HIGH": "High risk",
         "MEDIUM": "Moderate risk",
         "LOW": "Low risk",
-        "UNKNOWN": "Insufficient evidence",
-    }.get(overall_risk, "Insufficient evidence")
+        "UNKNOWN": "Insufficient Information",
+    }.get(overall_risk, "Insufficient Information")
 
 
 def _recommendation(overall_risk: str, final_category: str) -> str:
-    if final_category == "Do Not Proceed":
-        return (
-            "Do not proceed with investment. The identified risks and evidence "
-            "limitations are too significant for the current stage."
-        )
+    if final_category == "Do Not Proceed" or overall_risk in {"CRITICAL", "HIGH"}:
+        return "High Risk — Exercise Caution"
     if final_category == "Hold / Further Investigation Required":
-        return (
-            "Hold the opportunity and complete further investigation before "
-            "making an investment decision."
-        )
+        return "Potential Investment — Requires Validation"
     if final_category == "Proceed Conditionally":
-        return (
-            "Proceed only conditionally, with explicit diligence conditions and "
-            "primary-source verification."
-        )
-    return (
-        "The available evidence supports proceeding to the next diligence stage, "
-        "subject to standard verification and documentation review."
-    )
+        return "Potential Investment — Requires Validation"
+    if final_category == "Proceed to Next Stage":
+        return "Proceed with Further Due Diligence"
+    if overall_risk == "UNKNOWN":
+        return "Insufficient Information for Assessment"
+    return "Proceed with Further Due Diligence"
 
 
 def _final_category(
@@ -477,6 +491,7 @@ def _executive_summary_text(
     output_count: int,
     failed_agents: List[str],
     all_findings: List[Dict[str, Any]],
+    missing_information: List[str],
 ) -> str:
     high_risk = [
         finding.get("dimension", "Unknown")
@@ -484,25 +499,21 @@ def _executive_summary_text(
         if str(finding.get("risk_level", "")).upper() in {"HIGH", "CRITICAL"}
     ]
     summary = (
-        f"{name} was assessed using {output_count} specialist agent report(s) and "
-        f"cross-checked against stored public evidence. The aggregate risk level is "
-        f"{overall_risk.lower()} and the verification status is "
-        f"{verification_status.lower().replace('_', ' ')}."
+        f"{name} was reviewed using {output_count} specialist report(s). "
+        f"Overall risk: {overall_risk.lower()}. "
+        f"Verification: {verification_status.lower().replace('_', ' ')}. "
+        f"Missing information items: {len(missing_information)}."
     )
     if high_risk:
         summary += (
-            " Material risk signals were identified in: "
-            + ", ".join(sorted(set(high_risk)))
-            + "."
+            " Key risk areas: " + ", ".join(sorted(set(high_risk))) + "."
         )
     if failed_agents:
         summary += (
-            " The following specialist agents failed and are excluded from completed "
-            "findings: " + ", ".join(failed_agents) + "."
+            " Failed agents: " + ", ".join(failed_agents) + "."
         )
     summary += (
-        " This report does not constitute independent verification, legal advice, "
-        "an audit, or an investment recommendation."
+        " This is not an investment recommendation."
     )
     return summary
 
@@ -729,18 +740,31 @@ def _specialist_section(
         )
 
     section = _section_base(title, content)
-    section["findings"] = [
-        {
-            "dimension": finding.get("dimension"),
-            "summary": finding.get("summary"),
-            "explanation": finding.get("explanation"),
-            "risk_level": finding.get("risk_level"),
-            "evidence_status": finding.get("evidence_status"),
-            "investor_impact": finding.get("investor_impact"),
-            "evidence_references": finding.get("evidence_references", []),
-        }
-        for finding in findings
-    ]
+    simplified_findings = []
+    for finding in findings:
+        if str(finding.get("evidence_status", "")).upper() == "UNAVAILABLE":
+            summary = "No public evidence was found for this area."
+            explanation = (
+                "The retrieved public sources do not support this dimension. "
+                "This is an information gap, not proof that the risk is absent."
+            )
+            investor_impact = "Request supporting documents before relying on this area."
+        else:
+            summary = _truncate(finding.get("summary"), 90)
+            explanation = _truncate(finding.get("explanation"), 150)
+            investor_impact = _truncate(finding.get("investor_impact"), 110)
+        simplified_findings.append(
+            {
+                "dimension": finding.get("dimension"),
+                "summary": summary,
+                "explanation": explanation,
+                "risk_level": finding.get("risk_level"),
+                "evidence_status": finding.get("evidence_status"),
+                "investor_impact": investor_impact,
+                "evidence_references": finding.get("evidence_references", []),
+            }
+        )
+    section["findings"] = simplified_findings
     section["evidence_references"] = [
         reference
         for reference in (output.get("evidence_references", []) if isinstance(output, dict) else [])
@@ -755,7 +779,7 @@ def _specialist_section(
                     finding.get("dimension", "Unknown"),
                     finding.get("risk_level", "UNKNOWN"),
                     finding.get("evidence_status", "UNAVAILABLE"),
-                    _truncate(finding.get("summary", ""), 120),
+                    _truncate(finding.get("summary", ""), 90),
                 ]
                 for finding in findings
             ],
@@ -1294,3 +1318,231 @@ def _truncate(value: Any, length: int) -> str:
     if len(text) <= length:
         return text
     return text[: length - 3].rsplit(" ", 1)[0] + "..."
+
+def _outlook_label(overall_risk: str) -> str:
+    return {
+        "LOW": "Promising",
+        "MEDIUM": "Promising but requires further due diligence",
+        "HIGH": "High risk",
+        "CRITICAL": "High risk",
+        "UNKNOWN": "Insufficient information to assess",
+    }.get(str(overall_risk).upper(), "Insufficient information to assess")
+
+
+def _confidence_level(verification_status: str, evidence_status: str) -> str:
+    status = str(verification_status or evidence_status or "").upper()
+    if status == "VERIFIED":
+        return "High"
+    if status == "PARTIALLY_VERIFIED":
+        return "Medium"
+    return "Low"
+
+
+def _action_section(analysis, overall_risk, missing_information, all_findings, contradictions, verification_status):
+    rows = []
+    for finding in all_findings:
+        risk = str(finding.get("risk_level", "")).upper()
+        if risk in {"HIGH", "CRITICAL"}:
+            rows.append([
+                "Critical" if risk == "CRITICAL" else "High",
+                "Investigate " + str(finding.get("dimension", "this area")),
+                "This area has a material risk signal in the retrieved evidence.",
+                "Primary source documents and independent verification",
+            ])
+    for item in (missing_information or [])[:6]:
+        rows.append([
+            "High",
+            "Request documentation for: " + str(item),
+            "The analysis could not verify this item from public evidence.",
+            "Startup-provided primary documentation",
+        ])
+    if contradictions:
+        rows.append([
+            "Critical",
+            "Reconcile conflicting specialist findings",
+            "Specialist agents interpreted the same evidence differently.",
+            "Primary records and expert review",
+        ])
+    if not rows:
+        rows.append([
+            "Medium",
+            "Complete standard document review",
+            "No critical gaps were identified in the retrieved evidence.",
+            "Standard diligence document package",
+        ])
+    rows.append([
+        "Medium",
+        "General due diligence suggestion: review financial statements, customer contracts, cap table, and incorporation documents",
+        "These are standard investor checks and are not startup-specific findings.",
+        "Startup document package",
+    ])
+    rows = rows[:8]
+    content = [
+        "Prioritized actions are based on the analysis. General suggestions are clearly labeled.",
+    ]
+    section = _section_base("What Should the Investor Do?", content)
+    section["tables"] = [{"title": "Action plan", "columns": ["Priority", "Action Required", "Why It Matters", "Evidence Needed"], "rows": rows}]
+    section["verification_status"] = verification_status
+    return section
+
+
+def _scorecard_section(outputs, verification, source_reliability, overall_risk):
+    def status_from_risk(risk):
+        risk = str(risk or "").upper()
+        if risk == "LOW":
+            return "Strong"
+        if risk == "MEDIUM":
+            return "Moderate"
+        if risk in {"HIGH", "CRITICAL"}:
+            return "Weak"
+        return "Insufficient Data"
+
+    financial = outputs.get("financial", {})
+    marketing = outputs.get("marketing", {})
+    legal = outputs.get("legal", {})
+    evidence_status = str((verification or {}).get("verification_status") or (verification or {}).get("status") or "UNAVAILABLE").upper()
+    evidence_status_label = "Strong" if evidence_status == "VERIFIED" else "Moderate" if evidence_status == "PARTIALLY_VERIFIED" else "Weak" if evidence_status in {"UNVERIFIED", "CONTRADICTED"} else "Insufficient Data"
+
+    rows = [
+        ["Financial Health", status_from_risk(financial.get("risk_level", "UNKNOWN")), str(financial.get("investor_impact") or "No financial assessment available."), str(financial.get("risk_level", "UNKNOWN"))],
+        ["Market Opportunity", status_from_risk(marketing.get("risk_level", "UNKNOWN")), str(marketing.get("investor_impact") or "No market assessment available."), str(marketing.get("risk_level", "UNKNOWN"))],
+        ["Marketing and Customer Traction", status_from_risk(marketing.get("risk_level", "UNKNOWN")), "Derived from retrieved market evidence.", str(marketing.get("evidence_status", "UNAVAILABLE"))],
+        ["Legal and Compliance", status_from_risk(legal.get("risk_level", "UNKNOWN")), str(legal.get("investor_impact") or "No legal assessment available."), str(legal.get("risk_level", "UNKNOWN"))],
+        ["Evidence Reliability", evidence_status_label, "Based on verification of specialist claims against stored evidence.", evidence_status],
+    ]
+    content = [
+        "Scores are qualitative assessments, not fabricated numerical scores.",
+    ]
+    section = _section_base("Investment Scorecard", content)
+    section["tables"] = [{"title": "Scorecard", "columns": ["Category", "Status", "Explanation", "Supporting Signal"], "rows": rows}]
+    section["verification_status"] = evidence_status
+    return section
+
+
+def _positives_section(all_findings, outputs):
+    positives = [f for f in all_findings if str(f.get("risk_level", "")).upper() == "LOW"]
+    content = [
+        "These are the strongest positive signals found in the retrieved evidence. They are not proof of investment quality."
+    ] if positives else [
+        "No strong positive signals were identified in the retrieved evidence."
+    ]
+    section = _section_base("Reasons to Consider Investing", content)
+    section["findings"] = [
+        {
+            "dimension": f.get("dimension"),
+            "summary": f.get("summary"),
+            "risk_level": f.get("risk_level"),
+            "evidence_status": f.get("evidence_status"),
+            "investor_impact": f.get("investor_impact"),
+            "evidence_references": f.get("evidence_references", []),
+        }
+        for f in positives
+    ]
+    return section
+
+
+def _risks_section(all_findings, outputs):
+    risks = [f for f in all_findings if str(f.get("risk_level", "")).upper() in {"MEDIUM", "HIGH", "CRITICAL"}]
+    content = [
+        "Risks are grouped by severity. Each risk is only as strong as its underlying evidence."
+    ]
+    section = _section_base("Major Risks and Red Flags", content)
+    section["findings"] = [
+        {
+            "dimension": f.get("dimension"),
+            "summary": f.get("summary"),
+            "risk_level": f.get("risk_level"),
+            "evidence_status": f.get("evidence_status"),
+            "investor_impact": f.get("investor_impact"),
+            "evidence_references": f.get("evidence_references", []),
+        }
+        for f in risks
+    ]
+    section["risk_indicators"] = _risk_indicators(risks)
+    return section
+
+
+def _agent_analysis_section(analysis, outputs, verification, all_findings):
+    content = []
+    for key in ["financial", "marketing", "legal"]:
+        output = outputs.get(key, {})
+        name = {"financial": "Financial Agent", "marketing": "Marketing Agent", "legal": "Legal Agent"}[key]
+        content.append(
+            name + ": Overall risk " + str(output.get("risk_level", "UNKNOWN")) + "; evidence status " + str(output.get("evidence_status", "UNAVAILABLE")) + ". " +
+            str(output.get("investor_impact") or "No investor impact summary available.")
+        )
+        missing = output.get("missing_information") or []
+        if missing:
+            content.append(name + " missing information: " + "; ".join(str(x) for x in missing[:5]) + ".")
+    if verification:
+        content.append(
+            "Verification Agent: " + str(verification.get("verification_status") or verification.get("status") or "UNAVAILABLE") + ". " +
+            str(verification.get("detailed_reasoning") or "")
+        )
+    content.append("Controller Agent: Synthesis is based on specialist findings and verification results. No unsupported conclusions are added.")
+    section = _section_base("Agent-by-Agent Analysis", content)
+    section["findings"] = [
+        {
+            "dimension": f.get("dimension"),
+            "summary": f.get("summary"),
+            "risk_level": f.get("risk_level"),
+            "evidence_status": f.get("evidence_status"),
+            "agent": f.get("agent_name"),
+        }
+        for f in all_findings
+    ]
+    return section
+
+
+def _missing_section(missing_information, all_findings, failed_agents):
+    content = [
+        "The following items were not available in the retrieved evidence. They are reported, not estimated."
+    ]
+    if not missing_information and not failed_agents:
+        content.append("No information gaps were identified in the retrieved evidence set.")
+    section = _section_base("Missing Information and Due Diligence Checklist", content)
+    section["tables"] = [{"title": "Missing information", "columns": ["Gap"], "rows": [[item] for item in (missing_information or [])]}]
+    if failed_agents:
+        section["tables"].append({"title": "Failed specialist agents", "columns": ["Agent"], "rows": [[agent] for agent in failed_agents]})
+    checklist = [
+        "Financial statements",
+        "Revenue breakdown",
+        "Customer contracts",
+        "Customer retention data",
+        "Cap table",
+        "Incorporation documents",
+        "Intellectual property ownership documents",
+    ]
+    section["tables"].append({"title": "Due diligence checklist", "columns": ["Item"], "rows": [[item] for item in checklist]})
+    return section
+
+
+def _evidence_section(evidence_references, verification):
+    content = [
+        "Sources are listed with their verification status. Links are provided when available."
+    ]
+    section = _section_base("Evidence and Sources", content)
+    section["evidence_references"] = [r for r in (evidence_references or []) if isinstance(r, dict)]
+    if verification:
+        for ref in (verification.get("supporting_evidence") or []):
+            if isinstance(ref, dict) and ref not in section["evidence_references"]:
+                section["evidence_references"].append(ref)
+    return section
+
+
+def _final_guidance_section(analysis, overall_risk, verification_status, final_category, missing_information, all_findings):
+    most_important_risk = "None identified"
+    risks = [f for f in all_findings if str(f.get("risk_level", "")).upper() in {"HIGH", "CRITICAL"}]
+    if risks:
+        most_important_risk = str(risks[0].get("dimension") or risks[0].get("summary") or "High risk finding")
+    what_must_verify = [str(x) for x in (missing_information or ["No additional verification items identified."])[:3]]
+    content = [
+        "Investment Outlook: " + _outlook_label(overall_risk),
+        "Main Reason: " + str(analysis.startup_name) + " was assessed using retrieved public evidence and specialist analysis.",
+        "Most Important Risk: " + most_important_risk,
+        "Next Step: " + _recommendation(overall_risk, final_category),
+        "What Must Be Verified Before Proceeding: " + "; ".join(what_must_verify),
+    ]
+    section = _section_base("Final Investor Decision Guidance", content)
+    section["final_assessment_category"] = final_category
+    return section

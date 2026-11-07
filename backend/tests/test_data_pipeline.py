@@ -1,6 +1,6 @@
 import unittest
 from io import BytesIO
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -354,7 +354,7 @@ class RobotsPolicyTests(DatabaseTestCase):
             status_code=200,
             content="hello",
         )
-        entry.expires_at = datetime.utcnow() - timedelta(seconds=1)
+        entry.expires_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(seconds=1)
         self.db.commit()
 
         self.assertIsNone(cache.get("https://acme.example/"))
