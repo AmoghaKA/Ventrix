@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fpdf import FPDF
@@ -94,7 +94,24 @@ def generate_final_report(
     ]
 
     final_category = sections[-1]["final_assessment_category"]
-    generated_at = datetime.utcnow().isoformat() + "Z"
+    generated_at = datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z"
+
+    key_positive_indicators = sorted(
+        {
+            finding.get("dimension")
+            for finding in all_findings
+            if str(finding.get("risk_level", "")).upper() == "LOW"
+            and finding.get("dimension")
+        }
+    )
+    major_concerns = sorted(
+        {
+            finding.get("dimension")
+            for finding in all_findings
+            if str(finding.get("risk_level", "")).upper() in {"HIGH", "CRITICAL"}
+            and finding.get("dimension")
+        }
+    )
 
     return {
         "title": f"{analysis.startup_name} Investor Due Diligence Report",
@@ -124,6 +141,8 @@ def generate_final_report(
         ),
         "verification_status": verification_status,
         "recommendation": _recommendation(overall_risk, final_category),
+        "key_positive_indicators": key_positive_indicators,
+        "major_concerns": major_concerns,
         "executive_summary": _executive_summary_text(
             analysis.startup_name,
             overall_risk,
@@ -242,7 +261,7 @@ def generate_report_pdf(
     pdf.set_font("Helvetica", "", 9)
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(0, 5, _pdf_text(report.get("disclaimer", "")))
-    pdf_output = pdf.output(dest="S")
+    pdf_output = pdf.output()
 
     if isinstance(pdf_output, str):
         return pdf_output.encode("latin-1")
@@ -420,30 +439,22 @@ def _assessment(overall_risk: str) -> str:
         "HIGH": "High risk",
         "MEDIUM": "Moderate risk",
         "LOW": "Low risk",
-        "UNKNOWN": "Insufficient evidence",
-    }.get(overall_risk, "Insufficient evidence")
+        "UNKNOWN": "Insufficient Information",
+    }.get(overall_risk, "Insufficient Information")
 
 
 def _recommendation(overall_risk: str, final_category: str) -> str:
-    if final_category == "Do Not Proceed":
-        return (
-            "Do not proceed with investment. The identified risks and evidence "
-            "limitations are too significant for the current stage."
-        )
+    if final_category == "Do Not Proceed" or overall_risk in {"CRITICAL", "HIGH"}:
+        return "High Risk — Exercise Caution"
     if final_category == "Hold / Further Investigation Required":
-        return (
-            "Hold the opportunity and complete further investigation before "
-            "making an investment decision."
-        )
+        return "Potential Investment — Requires Validation"
     if final_category == "Proceed Conditionally":
-        return (
-            "Proceed only conditionally, with explicit diligence conditions and "
-            "primary-source verification."
-        )
-    return (
-        "The available evidence supports proceeding to the next diligence stage, "
-        "subject to standard verification and documentation review."
-    )
+        return "Potential Investment — Requires Validation"
+    if final_category == "Proceed to Next Stage":
+        return "Proceed with Further Due Diligence"
+    if overall_risk == "UNKNOWN":
+        return "Insufficient Information for Assessment"
+    return "Proceed with Further Due Diligence"
 
 
 def _final_category(

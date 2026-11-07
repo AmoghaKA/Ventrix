@@ -1,6 +1,6 @@
 import asyncio
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import logging
@@ -8,6 +8,7 @@ import logging
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
+from app.agents.base import BaseAgent
 from app.agents.evidence_agent import EvidenceAgent
 from app.agents.orchestrator import AgentDefinition, resolve_agent
 from app.agents.output import AgentOutput, ExecutionStatus
@@ -53,7 +54,9 @@ WORKFLOW_STEPS: Tuple[Tuple[str, str, int], ...] = (
 )
 
 
-class ControllerAgent:
+class ControllerAgent(BaseAgent):
+    """Production database/workflow-backed Controller Agent used by LangGraph."""
+
     def __init__(
         self,
         db: Session,
@@ -64,6 +67,7 @@ class ControllerAgent:
         max_pages: int = 5,
         llm_gateway_instance=llm_gateway,
     ) -> None:
+        super().__init__("Controller Agent")
         self.db = db
         self.workflow_id = workflow.id
         self.retry_limit = (
@@ -73,6 +77,16 @@ class ControllerAgent:
         self.max_pages = max_pages
         self.llm = llm_gateway_instance
         self._ensure_status_rows()
+
+    async def run(
+        self,
+        startup_id: int,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        """Controller orchestration is workflow-driven, not a single agent run."""
+        raise NotImplementedError(
+            "ControllerAgent orchestration is invoked through the workflow service."
+        )
 
     def _workflow(self) -> DueDiligenceWorkflow:
         workflow = self.db.get(DueDiligenceWorkflow, self.workflow_id)
@@ -170,7 +184,7 @@ class ControllerAgent:
         error_details: Any = _UNSET,
     ) -> WorkflowAgentStatus:
         row = self._status_row(agent_key)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         row.status = status.value
         if attempt_count is not None:
             row.attempt_count = attempt_count
@@ -220,7 +234,7 @@ class ControllerAgent:
         report: Any = _UNSET,
     ) -> None:
         workflow = self._workflow()
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         workflow.state = jsonable_encoder(state)
         workflow.current_step = step
         if status is not None:
@@ -263,7 +277,7 @@ class ControllerAgent:
         workflow.status = WorkflowStatus.RUNNING.value
         workflow.current_step = "data_retrieval"
         if workflow.started_at is None:
-            workflow.started_at = datetime.utcnow()
+            workflow.started_at = datetime.now(timezone.utc).replace(tzinfo=None)
         analysis.status = "running"
         self.db.commit()
         self.log(
@@ -737,7 +751,7 @@ class ControllerAgent:
             workflow.report = jsonable_encoder(report)
             workflow.status = WorkflowStatus.COMPLETED.value
             workflow.current_step = "completed"
-            workflow.completed_at = datetime.utcnow()
+            workflow.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
             analysis.status = "completed"
             analysis.overall_assessment = report.get("overall_assessment")
             self.db.commit()
@@ -840,7 +854,7 @@ class ControllerAgent:
         workflow.status = WorkflowStatus.FAILED.value
         workflow.current_step = "failed"
         workflow.error_details = str(error)
-        workflow.completed_at = datetime.utcnow()
+        workflow.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
         analysis.status = "failed"
         self.db.commit()
 

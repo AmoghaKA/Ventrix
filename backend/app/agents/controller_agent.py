@@ -4,6 +4,8 @@ import uuid
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from app.agents.base import BaseAgent
+from app.agents.output import AgentOutput, ExecutionStatus
+from app.agents.verification import VerificationOutput
 from app.llm.gateway import llm_gateway
 from app.schemas.controller import (
     AgentResult,
@@ -22,6 +24,7 @@ RunCreator = Callable[[StartupInput], Awaitable[str]]
 
 
 class ControllerAgent(BaseAgent):
+    """Mockable in-memory Controller Agent used for isolated tests and mock agent coordination."""
     def __init__(
         self,
         *,
@@ -65,7 +68,19 @@ class ControllerAgent(BaseAgent):
     async def _run_specialist(self, key: str, runner: SpecialistRunner, startup: StartupInput) -> AgentResult:
         try:
             result = await runner(startup)
-            if not isinstance(result, AgentResult):
+            if isinstance(result, AgentOutput):
+                status = "failed" if (
+                    result.execution_status == ExecutionStatus.FAILED
+                    or result.error_details
+                ) else "completed"
+                result = AgentResult(
+                    agent_key=key,
+                    agent_name=result.agent_name or key,
+                    status=status,
+                    output=result.model_dump(mode="json"),
+                    error=result.error_details,
+                )
+            elif not isinstance(result, AgentResult):
                 result = AgentResult.model_validate(result)
             return result
         except Exception as exc:  # noqa: BLE001
@@ -147,7 +162,18 @@ class ControllerAgent(BaseAgent):
         if self.verification_agent is not None:
             try:
                 verification_result = await self.verification_agent(agent_results)
-                if not isinstance(verification_result, VerificationResult):
+                if isinstance(verification_result, VerificationOutput):
+                    verification_result = VerificationResult(
+                        status=(
+                            "failed"
+                            if verification_result.execution_status == ExecutionStatus.FAILED
+                            else "completed"
+                        ),
+                        verification_status=verification_result.verification_status.value,
+                        result=verification_result.model_dump(mode="json"),
+                        error=verification_result.error_details,
+                    )
+                elif not isinstance(verification_result, VerificationResult):
                     verification_result = VerificationResult.model_validate(verification_result)
             except Exception as exc:  # noqa: BLE001
                 logger.exception("Verification agent failed")

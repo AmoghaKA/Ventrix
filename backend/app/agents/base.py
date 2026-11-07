@@ -14,9 +14,14 @@ class BaseAgent(ABC):
     unchanged so callers receive the schema defined by the agent.
     """
 
+    agent_key: Optional[str] = None
+    AGENT_NAME: str = "Base Agent"
+
     def __init__(self, name: str):
         self.name = name
         self.logger = logger
+        if self.agent_key is None:
+            self.agent_key = name.strip().lower().replace(" ", "_")
 
     @abstractmethod
     async def run(
