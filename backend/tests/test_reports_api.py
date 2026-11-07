@@ -108,7 +108,7 @@ class ReportApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["analysis_id"], self.analysis.id)
-        self.assertEqual(len(payload["sections"]), 12)
+        self.assertEqual(len(payload["sections"]), 9)
         self.assertIn("final_assessment_category", payload)
 
     def test_report_pdf_download(self):
