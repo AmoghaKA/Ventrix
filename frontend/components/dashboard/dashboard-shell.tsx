@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Bell,
@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/auth/auth-provider";
 import { CommandPalette } from "./command-palette";
 import {
   accountNav,
@@ -31,8 +32,17 @@ export function DashboardShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, loading: authLoading, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // Protect the dashboard: redirect unauthenticated users to sign in.
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace("/sign-in");
+    }
+  }, [authLoading, user, router]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -48,6 +58,29 @@ export function DashboardShell({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  const displayName =
+    (user?.user_metadata?.full_name as string | undefined) ||
+    user?.email ||
+    "User";
+  const initials = (displayName || "U")
+    .split(" ")
+    .map((p) => p[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-blue-accent" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   const currentPage =
     allNavItems.find((item) => isNavItemActive(item, pathname)) ??
@@ -182,21 +215,25 @@ export function DashboardShell({
         <div className="relative border-t border-slate-100 p-4">
           <div className="flex items-center gap-2.5 rounded-xl px-1 py-1">
             <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-[11px] font-semibold text-white shadow-sm ring-2 ring-white">
-              AM
+              {initials}
               <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-semibold text-slate-900">
-                User
+                {displayName}
               </p>
               <p className="truncate text-[11px] text-slate-500">
-                Team
+                {user?.email}
               </p>
             </div>
             <button
               type="button"
+              onClick={async () => {
+                await signOut();
+                router.push("/sign-in");
+              }}
               className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-              aria-label="Account settings"
+              aria-label="Sign out"
             >
               <LogOut className="h-3.5 w-3.5" />
             </button>
@@ -266,11 +303,11 @@ export function DashboardShell({
                   className="flex items-center gap-2 rounded-xl px-1 py-1 transition-colors hover:bg-slate-100 sm:gap-2.5 sm:px-2"
                 >
                   <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-[11px] font-semibold text-white ring-2 ring-white">
-                    AM
+                    {initials}
                   </span>
                   <span className="hidden text-left leading-tight sm:block">
                     <span className="block text-xs font-semibold text-slate-900">
-                      User
+                      {displayName}
                     </span>
                     <span className="block text-[10px] text-slate-500">
                       Workspace
