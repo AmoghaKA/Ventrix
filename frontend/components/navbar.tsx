@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/components/auth/auth-provider";
 
 const navLinks = [
   { name: "Platform", href: "#platform" },
@@ -15,10 +16,11 @@ const navLinks = [
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
+  const { user, loading, signOut } = useAuth();
 
-  const goToDashboard = () => {
+  const go = (path: string) => {
     setIsOpen(false);
-    router.push("/dashboard");
+    router.push(path);
   };
 
   return (
@@ -45,8 +47,17 @@ export function Navbar() {
                 {link.name}
               </Link>
             ))}
-            <Button variant="ghost" size="sm" onClick={goToDashboard}>Log in</Button>
-            <Button variant="primary" size="sm" onClick={goToDashboard}>Get started <span className="ml-1.5">→</span></Button>
+            {!loading && user ? (
+              <>
+                <Button variant="ghost" size="sm" onClick={() => go("/dashboard")}>Dashboard</Button>
+                <Button variant="secondary" size="sm" onClick={async () => { await signOut(); go("/sign-in"); }}>Sign out</Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" onClick={() => go("/sign-in")}>Log in</Button>
+                <Button variant="primary" size="sm" onClick={() => go("/sign-up")}>Get started <span className="ml-1.5">→</span></Button>
+              </>
+            )}
           </div>
 
           <button
@@ -68,7 +79,11 @@ export function Navbar() {
                   {link.name}
                 </Link>
               ))}
-              <Button variant="primary" size="sm" className="mt-2" onClick={goToDashboard}>Get started</Button>
+              {!loading && user ? (
+                <Button variant="primary" size="sm" className="mt-2" onClick={() => go("/dashboard")}>Dashboard</Button>
+              ) : (
+                <Button variant="primary" size="sm" className="mt-2" onClick={() => go("/sign-in")}>Get started</Button>
+              )}
             </div>
           </div>
         )}
