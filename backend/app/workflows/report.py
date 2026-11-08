@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fpdf import FPDF
+from fpdf.enums import XPos, YPos
 
 from app.db.models import Analysis, Startup
 
@@ -225,6 +226,44 @@ def generate_report_pdf(
             pdf.multi_cell(0, 5, _pdf_text(paragraph))
             pdf.ln(2)
 
+        for finding in section.get("findings", []):
+            dimension = (
+                finding.get("dimension")
+                or finding.get("title")
+                or "Finding"
+            )
+            risk = _pdf_label(finding.get("risk_level") or "Unknown")
+            evidence = _pdf_label(finding.get("evidence_status") or "Unavailable")
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.multi_cell(
+                0,
+                5,
+                _pdf_text(f"{dimension} - {risk} risk - {evidence} evidence"),
+                new_x=XPos.LMARGIN,
+                new_y=YPos.NEXT,
+            )
+            summary = finding.get("summary")
+            if summary:
+                pdf.set_font("Helvetica", "", 9)
+                pdf.multi_cell(
+                    0,
+                    5,
+                    _pdf_text(summary),
+                    new_x=XPos.LMARGIN,
+                    new_y=YPos.NEXT,
+                )
+            impact = finding.get("investor_impact")
+            if impact:
+                pdf.set_font("Helvetica", "I", 9)
+                pdf.multi_cell(
+                    0,
+                    5,
+                    _pdf_text(f"Investor impact: {impact}"),
+                    new_x=XPos.LMARGIN,
+                    new_y=YPos.NEXT,
+                )
+            pdf.ln(1)
+
         for table in section.get("tables", []):
             _pdf_table(pdf, table)
 
@@ -232,7 +271,13 @@ def generate_report_pdf(
             pdf.set_font("Helvetica", "B", 10)
             pdf.write(5, _pdf_text(f"{indicator.get('label', 'Risk')}: "))
             pdf.set_font("Helvetica", "", 10)
-            pdf.write(5, _pdf_text(f"{indicator.get('level', 'UNKNOWN')} - {indicator.get('reason', '')}"))
+            pdf.write(
+                5,
+                _pdf_text(
+                    f"{_pdf_label(indicator.get('level', 'UNKNOWN'))} - "
+                    f"{indicator.get('reason', '')}"
+                ),
+            )
             pdf.ln(5)
 
         refs = section.get("evidence_references", [])
@@ -272,22 +317,60 @@ def _pdf_text(value: Any) -> str:
     return str(value).encode("latin-1", "replace").decode("latin-1")
 
 
+def _pdf_label(value: Any) -> str:
+    return str(value or "").replace("_", " ").strip().title()
+
+
+def _pdf_row_lines(values: List[str], widths: List[float]) -> int:
+    lines = 1
+    for width, value in zip(widths, values):
+        # Approximate how many characters fit on one line at 8pt.
+        chars_per_line = max(1, int(width / 1.55))
+        lines = max(lines, (len(value) + chars_per_line - 1) // chars_per_line)
+    return lines
+
+
 def _pdf_table(pdf: FPDF, table: Dict[str, Any]) -> None:
-    columns = table.get("columns", [])
+    columns = [str(column) for column in table.get("columns", [])]
     rows = table.get("rows", [])
     if not columns or not rows:
         return
 
-    pdf.set_font("Helvetica", "B", 9)
-    widths = [190 / len(columns)] * len(columns)
-    for column in columns:
-        pdf.cell(widths[0], 6, _pdf_text(str(column)[:40]), border=1)
-    pdf.ln()
+    page_width = pdf.w - pdf.l_margin - pdf.r_margin
+    widths = [page_width / len(columns)] * len(columns)
+    line_height = 4.5
+
+    pdf.set_font("Helvetica", "B", 8)
+    header_lines = _pdf_row_lines(columns, widths)
+    for width, column in zip(widths, columns):
+        pdf.multi_cell(
+            width,
+            line_height,
+            _pdf_text(column),
+            border=1,
+            align="L",
+            new_x=XPos.RIGHT,
+            new_y=YPos.TOP,
+            max_line_height=line_height,
+        )
+    pdf.ln(line_height * header_lines)
+
     pdf.set_font("Helvetica", "", 8)
     for row in rows[:25]:
-        for index, value in enumerate(row):
-            pdf.cell(widths[index % len(widths)], 6, _pdf_text(str(value)[:45]), border=1)
-        pdf.ln()
+        values = [_pdf_text(str(value)) for value in row]
+        row_lines = _pdf_row_lines(values, widths)
+        for width, value in zip(widths, values):
+            pdf.multi_cell(
+                width,
+                line_height,
+                value,
+                border=1,
+                align="L",
+                new_x=XPos.RIGHT,
+                new_y=YPos.TOP,
+                max_line_height=line_height,
+            )
+        pdf.ln(line_height * row_lines)
     pdf.ln(2)
 
 

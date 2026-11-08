@@ -29,7 +29,7 @@ class Analysis(Base):
     additional_information = Column(Text, nullable=True)
     status = Column(String(32), nullable=False, default="pending", index=True)
     overall_assessment = Column(String(64), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     updated_at = Column(
         DateTime,
         default=datetime.utcnow,
@@ -49,7 +49,7 @@ class Startup(Base):
     industry = Column(String(120), nullable=True)
     stage = Column(String(64), nullable=True)
     location = Column(String(120), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     updated_at = Column(
         DateTime,
         default=datetime.utcnow,
@@ -99,7 +99,7 @@ class Evidence(Base):
     findings = Column(JSON, nullable=False, default=list)
     source_metadata = Column(JSON, nullable=False, default=dict)
     content_hash = Column(String(64), nullable=False, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     updated_at = Column(
         DateTime,
         default=datetime.utcnow,
@@ -139,7 +139,7 @@ class DocumentExtractionFailure(Base):
     failure_stage = Column(String(64), nullable=False)
     error_category = Column(String(64), nullable=False)
     description = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     updated_at = Column(
         DateTime,
         default=datetime.utcnow,
@@ -191,7 +191,7 @@ class DueDiligenceWorkflow(Base):
     report = Column(JSON, nullable=True)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     updated_at = Column(
         DateTime,
         default=datetime.utcnow,
@@ -237,7 +237,7 @@ class WorkflowAgentStatus(Base):
     error_details = Column(Text, nullable=True)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     updated_at = Column(
         DateTime,
         default=datetime.utcnow,
@@ -282,7 +282,7 @@ class WorkflowCheckpoint(Base):
     )
     step = Column(String(64), nullable=False)
     state = Column(JSON, nullable=False, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
 
 def _now_utc():

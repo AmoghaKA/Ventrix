@@ -833,6 +833,8 @@ class ControllerAgent(BaseAgent):
                     prompt=prompt,
                     response_schema=ControllerAssessment,
                 )
+                if result.provider == "Mock LLM":
+                    raise ValueError("Mock provider output is not an assessment")
                 if result.parsed is not None:
                     return result.parsed
                 logger.warning(
@@ -842,11 +844,99 @@ class ControllerAgent(BaseAgent):
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Controller LLM assessment failed on attempt %s: %s", attempt, exc)
 
+        return self._fallback_assessment(
+            analysis,
+            specialist_outputs,
+            specialist_errors,
+            verification,
+        )
+
+    def _fallback_assessment(
+        self,
+        analysis: Analysis,
+        specialist_outputs: Dict[str, Any],
+        specialist_errors: Dict[str, Any],
+        verification: Optional[Dict[str, Any]],
+    ) -> ControllerAssessment:
+        """Build an evidence-backed assessment when no LLM is available."""
+
+        risk_order = {"UNKNOWN": 0, "LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
+        overall_risk = "UNKNOWN"
+        key_risks: List[str] = []
+        missing_information: List[str] = []
+        completed = 0
+
+        for key, output in specialist_outputs.items():
+            if not isinstance(output, dict):
+                continue
+            if str(output.get("execution_status", "")).upper() != "FAILED":
+                completed += 1
+
+            risk = str(output.get("risk_level", "UNKNOWN")).upper()
+            if risk_order.get(risk, 0) > risk_order.get(overall_risk, 0):
+                overall_risk = risk
+
+            for finding in output.get("findings", []) or []:
+                if not isinstance(finding, dict):
+                    continue
+                finding_risk = str(finding.get("risk_level", "")).upper()
+                if finding_risk not in {"HIGH", "CRITICAL"}:
+                    continue
+                dimension = str(finding.get("dimension") or key.title())
+                impact = finding.get("investor_impact") or finding.get("summary")
+                key_risks.append(f"{dimension}: {impact}" if impact else dimension)
+
+            for item in output.get("missing_information", []) or []:
+                item_text = str(item).strip()
+                if item_text:
+                    missing_information.append(item_text)
+
+        for key, error in specialist_errors.items():
+            if error:
+                missing_information.append(f"{key}: {error}")
+
+        verification_status = "UNAVAILABLE"
+        if isinstance(verification, dict):
+            verification_status = str(
+                verification.get("verification_status")
+                or verification.get("status")
+                or "UNAVAILABLE"
+            ).upper()
+
+        key_risks = list(dict.fromkeys(key_risks))[:6]
+        missing_information = list(dict.fromkeys(missing_information))[:10]
+
+        summary = (
+            f"{analysis.startup_name} was reviewed using {completed} completed specialist "
+            f"report(s). Overall risk is {overall_risk.lower()}. Verification status is "
+            f"{verification_status.lower().replace('_', ' ')}."
+        )
+        if key_risks:
+            summary += f" {len(key_risks)} high-priority risk area(s) were flagged."
+        else:
+            summary += " No high-priority risk areas were flagged in the retrieved evidence."
+
+        next_steps: List[str] = []
+        if missing_information:
+            next_steps.append(
+                "Request the missing primary documentation before relying on this assessment."
+            )
+        if verification_status in {"UNVERIFIED", "PARTIALLY_VERIFIED", "UNAVAILABLE"}:
+            next_steps.append(
+                "Independently verify specialist claims against primary sources."
+            )
+        if key_risks:
+            next_steps.append(
+                "Review the flagged risk areas with the investment committee."
+            )
+        if not next_steps:
+            next_steps.append("Proceed with standard confirmatory due diligence.")
+
         return ControllerAssessment(
-            summary="Controller assessment unavailable; specialist outputs retained for review.",
-            key_risks=[],
-            missing_information=list(specialist_errors.values()) or ["No additional information provided."],
-            recommended_next_steps=["Review specialist agent outputs and evidence."],
+            summary=summary,
+            key_risks=key_risks,
+            missing_information=missing_information,
+            recommended_next_steps=next_steps,
         )
 
     def fail_workflow(self, error: str) -> Dict[str, Any]:

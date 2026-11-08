@@ -3,13 +3,50 @@ import { supabase } from "./supabase";
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
+let analysesCache: { data: AnalysisRecord[]; fetchedAt: number } | null = null;
+let analysesPromise: Promise<AnalysisRecord[]> | null = null;
+const ANALYSES_CACHE_TTL = 5_000;
+
+export function invalidateAnalysesCache() {
+  analysesCache = null;
+  analysesPromise = null;
+}
+
+let cachedToken: string | null = null;
+let tokenExpiresAt = 0;
+let tokenPromise: Promise<string | null> | null = null;
+
+supabase.auth.onAuthStateChange(() => {
+  cachedToken = null;
+  tokenExpiresAt = 0;
+  tokenPromise = null;
+});
+
 async function getAccessToken(): Promise<string | null> {
-  try {
-    const { data } = await supabase.auth.getSession();
-    return data.session?.access_token ?? null;
-  } catch {
-    return null;
-  }
+  const now = Date.now();
+  if (cachedToken && now < tokenExpiresAt) return cachedToken;
+  if (tokenPromise) return tokenPromise;
+
+  tokenPromise = (async () => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token ?? null;
+      const expiresAt = (data.session?.expires_at ?? 0) * 1000;
+      cachedToken = token;
+      tokenExpiresAt = expiresAt
+        ? Math.min(expiresAt - 60_000, Date.now() + 5 * 60_000)
+        : Date.now() + 60_000;
+      return token;
+    } catch {
+      cachedToken = null;
+      tokenExpiresAt = 0;
+      return null;
+    } finally {
+      tokenPromise = null;
+    }
+  })();
+
+  return tokenPromise;
 }
 
 export interface AnalysisSubmission {
@@ -96,6 +133,9 @@ export function createAnalysis(
   return apiRequest<AnalysisRecord>("/analyses", {
     method: "POST",
     body: JSON.stringify(input),
+  }).then((result) => {
+    invalidateAnalysesCache();
+    return result;
   });
 }
 
@@ -105,8 +145,25 @@ export function getAnalysis(
   return apiRequest<AnalysisRecord>(`/analyses/${analysisId}`);
 }
 
-export function listAnalyses(): Promise<AnalysisRecord[]> {
-  return apiRequest<AnalysisRecord[]>("/analyses");
+export function listAnalyses(force = false): Promise<AnalysisRecord[]> {
+  const now = Date.now();
+  if (
+    !force &&
+    analysesCache &&
+    now - analysesCache.fetchedAt < ANALYSES_CACHE_TTL
+  ) {
+    return Promise.resolve(analysesCache.data);
+  }
+  if (analysesPromise) return analysesPromise;
+  analysesPromise = apiRequest<AnalysisRecord[]>("/analyses")
+    .then((data) => {
+      analysesCache = { data, fetchedAt: Date.now() };
+      return data;
+    })
+    .finally(() => {
+      analysesPromise = null;
+    });
+  return analysesPromise;
 }
 
 
@@ -392,7 +449,9 @@ export async function startAnalysis(input: AnalysisSubmission): Promise<Analysis
     } catch {}
     throw new Error(message);
   }
-  return response.json() as Promise<AnalysisStartResponse>;
+  const result = (await response.json()) as AnalysisStartResponse;
+  invalidateAnalysesCache();
+  return result;
 }
 
 export async function getSystemUsage(): Promise<SystemUsage> {

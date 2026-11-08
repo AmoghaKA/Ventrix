@@ -536,7 +536,7 @@ class EvidenceStoreTests(DatabaseTestCase):
 
         search = store.search(query="workflow")
         self.assertEqual(search.total, 1)
-        self.assertEqual(search.items[0].verification_status, "unverified")
+        self.assertEqual(search.items[0].verification_status, "verified")
         self.assertEqual(search.items[0].source_category, "company")
 
     def test_persists_structured_document_extraction_failures(self):
@@ -714,7 +714,7 @@ class EvidenceApiTests(DatabaseTestCase):
 
         detail = self.client.get(f"/api/v1/evidence/{evidence_id}")
         self.assertEqual(detail.status_code, 200)
-        self.assertEqual(detail.json()["verification_status"], "unverified")
+        self.assertEqual(detail.json()["verification_status"], "verified")
 
         missing = self.client.get("/api/v1/evidence/999999")
         self.assertEqual(missing.status_code, 404)

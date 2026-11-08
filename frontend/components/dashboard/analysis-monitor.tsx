@@ -68,6 +68,12 @@ function normalizeStatus(status: string): StatusKey {
   return "pending";
 }
 
+function humanize(value: string | null | undefined): string {
+  const raw = (value ?? "").replace(/_/g, " ").trim();
+  if (!raw) return "";
+  return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+}
+
 function formatDate(value: string | null) {
   if (!value) return "Unavailable";
   const normalized = /[zZ]|[+-]\d{2}:?\d{2}$/.test(value)
@@ -284,7 +290,9 @@ export function AnalysisMonitor({ analysisId }: { analysisId: string }) {
                     </p>
                     <p className="mt-1 text-[10px] uppercase tracking-wider text-text-secondary/80">
                       {agent
-                        ? `${agent.status} · attempts ${agent.attempt_count} · started ${formatDate(agent.started_at)} · completed ${formatDate(agent.completed_at)}`
+                        ? `${statusMeta[stageStatus].label} · ${agent.attempt_count} attempt${
+                            agent.attempt_count === 1 ? "" : "s"
+                          } · started ${formatDate(agent.started_at)} · completed ${formatDate(agent.completed_at)}`
                         : "Not started"}
                     </p>
                     {agent?.error_details && (
@@ -307,7 +315,7 @@ export function AnalysisMonitor({ analysisId }: { analysisId: string }) {
               <div key={log.id} className="rounded-sm border border-border bg-secondary/30 px-3 py-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-accent">
-                    {log.event}
+                    {humanize(log.event)}
                   </span>
                   <span className="text-[10px] text-text-secondary">
                     {formatDate(log.timestamp)}
@@ -315,7 +323,9 @@ export function AnalysisMonitor({ analysisId }: { analysisId: string }) {
                 </div>
                 <p className="mt-1 text-xs text-text-primary">{log.message}</p>
                 {log.agent_key && (
-                  <p className="mt-1 text-[10px] text-text-secondary">Agent: {log.agent_key}</p>
+                  <p className="mt-1 text-[10px] text-text-secondary">
+                    Agent: {humanize(log.agent_key)}
+                  </p>
                 )}
               </div>
             ))}
