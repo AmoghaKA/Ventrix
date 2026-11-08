@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import (
@@ -34,10 +35,12 @@ from app.data import (
 )
 from app.db.models import (
     Analysis,
+    Profile,
     WorkflowActivityLog,
     WorkflowAgentStatus,
 )
 from app.db.session import get_db
+from app.core.auth import get_current_user_id
 from app.schemas import (
     AgentInfoOut,
     AgentRunOut,
@@ -61,6 +64,20 @@ from app.workflows.service import (
 api_router = APIRouter()
 
 
+def _require_owned_analysis(db: Session, analysis_id: int, user_id: Optional[str]) -> None:
+    analysis = db.get(Analysis, analysis_id)
+    if analysis is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Analysis {analysis_id} was not found.",
+        )
+    if user_id is not None and analysis.user_id is not None and analysis.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Analysis {analysis_id} was not found.",
+        )
+
+
 @api_router.get("/health", tags=["health"])
 async def api_health():
     return {"status": "ok"}
@@ -72,8 +89,15 @@ async def api_health():
     status_code=status.HTTP_201_CREATED,
     tags=["analyses"],
 )
-def create_analysis(payload: AnalysisCreate, db: Session = Depends(get_db)):
-    if db.query(Analysis).count() >= settings.MAX_ANALYSES:
+def create_analysis(
+    payload: AnalysisCreate,
+    db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
+):
+    count_query = db.query(Analysis)
+    if user_id is not None:
+        count_query = count_query.filter(Analysis.user_id == user_id)
+    if count_query.count() >= settings.MAX_ANALYSES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=(
@@ -82,6 +106,7 @@ def create_analysis(payload: AnalysisCreate, db: Session = Depends(get_db)):
             ),
         )
     analysis = Analysis(
+        user_id=user_id,
         startup_name=payload.startup_name.strip(),
         website=str(payload.website),
         country=payload.country.strip() if payload.country else None,
@@ -100,8 +125,14 @@ def create_analysis(payload: AnalysisCreate, db: Session = Depends(get_db)):
 
 
 @api_router.get("/analyses", response_model=List[AnalysisOut], tags=["analyses"])
-def list_analyses(db: Session = Depends(get_db)):
-    return db.query(Analysis).order_by(Analysis.created_at.desc()).all()
+def list_analyses(
+    db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
+):
+    query = db.query(Analysis)
+    if user_id is not None:
+        query = query.filter(Analysis.user_id == user_id)
+    return query.order_by(Analysis.created_at.desc()).all()
 
 
 @api_router.get(
@@ -109,12 +140,21 @@ def list_analyses(db: Session = Depends(get_db)):
     response_model=AnalysisOut,
     tags=["analyses"],
 )
-def get_analysis(analysis_id: int, db: Session = Depends(get_db)):
+def get_analysis(
+    analysis_id: int,
+    db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
+):
     analysis = db.get(Analysis, analysis_id)
     if analysis is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Analysis not found",
+            detail=f"Analysis {analysis_id} was not found.",
+        )
+    if user_id is not None and analysis.user_id is not None and analysis.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Analysis {analysis_id} was not found.",
         )
     return analysis
 
@@ -171,7 +211,9 @@ async def start_analysis(
     ),
     max_pages: int = Query(settings.WORKFLOW_MAX_PAGES, ge=1, le=10),
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
+    _require_owned_analysis(db, analysis_id, user_id)
     return _start_analysis_workflow(
         db,
         background_tasks,
@@ -198,7 +240,9 @@ async def start_analysis_workflow_alias(
     ),
     max_pages: int = Query(settings.WORKFLOW_MAX_PAGES, ge=1, le=10),
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
+    _require_owned_analysis(db, analysis_id, user_id)
     return _start_analysis_workflow(
         db,
         background_tasks,
@@ -216,7 +260,9 @@ async def start_analysis_workflow_alias(
 def get_workflow_status(
     analysis_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
+    _require_owned_analysis(db, analysis_id, user_id)
     try:
         return require_latest_workflow(db, analysis_id)
     except WorkflowNotFoundError as exc:
@@ -235,8 +281,9 @@ def get_workflow_status(
 def get_workflow_status_alias(
     analysis_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
-    return get_workflow_status(analysis_id, db)
+    return get_workflow_status(analysis_id, db, user_id)
 
 
 @api_router.get(
@@ -247,7 +294,9 @@ def get_workflow_status_alias(
 def get_workflow_agent_statuses(
     analysis_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
+    _require_owned_analysis(db, analysis_id, user_id)
     try:
         workflow = require_latest_workflow(db, analysis_id)
     except WorkflowNotFoundError as exc:
@@ -277,7 +326,9 @@ def get_workflow_activity_logs(
     limit: int = Query(200, ge=1, le=500),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
+    _require_owned_analysis(db, analysis_id, user_id)
     try:
         workflow = require_latest_workflow(db, analysis_id)
     except WorkflowNotFoundError as exc:
@@ -302,9 +353,15 @@ def get_workflow_activity_logs(
 async def _verify_analysis(
     db: Session,
     analysis_id: int,
+    user_id: Optional[str],
 ) -> VerificationOutput:
     analysis = db.get(Analysis, analysis_id)
     if analysis is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Analysis {analysis_id} was not found.",
+        )
+    if user_id is not None and analysis.user_id is not None and analysis.user_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Analysis {analysis_id} was not found.",
@@ -316,6 +373,7 @@ async def _verify_analysis(
             analysis.startup_name,
             analysis.website,
             industry=analysis.industry,
+            user_id=analysis.user_id,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -368,8 +426,9 @@ async def _verify_analysis(
 async def verify_analysis(
     analysis_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
-    return await _verify_analysis(db, analysis_id)
+    return await _verify_analysis(db, analysis_id, user_id)
 
 
 @api_router.post(
@@ -381,8 +440,9 @@ async def verify_analysis(
 async def verify_analysis_run_alias(
     analysis_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
-    return await _verify_analysis(db, analysis_id)
+    return await _verify_analysis(db, analysis_id, user_id)
 
 
 @api_router.post(
@@ -394,8 +454,9 @@ async def verify_analysis_run_alias(
 async def verify_analysis_agent_alias(
     analysis_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
-    return await _verify_analysis(db, analysis_id)
+    return await _verify_analysis(db, analysis_id, user_id)
 
 
 @api_router.get(
@@ -406,7 +467,9 @@ async def verify_analysis_agent_alias(
 def get_latest_verification(
     analysis_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
+    _require_owned_analysis(db, analysis_id, user_id)
     try:
         workflow = require_latest_workflow(db, analysis_id)
     except WorkflowNotFoundError as exc:
@@ -439,7 +502,9 @@ def get_latest_verification(
 def get_analysis_report(
     analysis_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
+    _require_owned_analysis(db, analysis_id, user_id)
     try:
         workflow = require_latest_workflow(db, analysis_id)
     except WorkflowNotFoundError as exc:
@@ -463,7 +528,9 @@ def get_analysis_report(
 def download_analysis_report_pdf(
     analysis_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
+    _require_owned_analysis(db, analysis_id, user_id)
     try:
         workflow = require_latest_workflow(db, analysis_id)
     except WorkflowNotFoundError as exc:
@@ -498,19 +565,26 @@ def download_analysis_report_pdf(
 def download_analysis_report_pdf_alias(
     analysis_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
-    return download_analysis_report_pdf(analysis_id, db)
+    return download_analysis_report_pdf(analysis_id, db, user_id)
 
 
 
 
 @api_router.get("/system/status", tags=["system"])
-def system_status(db: Session = Depends(get_db)):
+def system_status(
+    db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
+):
     from app.core.config import settings
 
     from app.llm.gateway import llm_gateway
 
-    analysis_count = db.query(Analysis).count()
+    count_query = db.query(Analysis)
+    if user_id is not None:
+        count_query = count_query.filter(Analysis.user_id == user_id)
+    analysis_count = count_query.count()
     providers = []
     for name, value in (
         ("Gemini", settings.GEMINI_API_KEY),
@@ -580,7 +654,9 @@ async def run_all_agents(
     analysis_id: int = Path(..., ge=1),
     agents: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
+    _require_owned_analysis(db, analysis_id, user_id)
     result = await _run_agents(db, analysis_id, agents)
     return AgentRunOut(
         analysis_id=result.analysis_id,
@@ -598,7 +674,9 @@ async def run_agent(
     analysis_id: int = Path(..., ge=1),
     agent_key: str = Path(..., min_length=1, max_length=64),
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
+    _require_owned_analysis(db, analysis_id, user_id)
     result = await _run_agents(db, analysis_id, [agent_key])
     if not result.outputs:
         raise HTTPException(
@@ -649,12 +727,18 @@ def collect_evidence(
     analysis_id: int,
     max_pages: int = Query(5, ge=1, le=10),
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
     analysis = db.get(Analysis, analysis_id)
     if analysis is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Analysis not found",
+            detail=f"Analysis {analysis_id} was not found.",
+        )
+    if user_id is not None and analysis.user_id is not None and analysis.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Analysis {analysis_id} was not found.",
         )
 
     store = EvidenceStore(db)
@@ -662,6 +746,7 @@ def collect_evidence(
         analysis.startup_name,
         analysis.website,
         industry=analysis.industry,
+        user_id=analysis.user_id,
     )
 
     retriever = PublicDataRetriever(
@@ -713,8 +798,10 @@ def search_evidence(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
     result = EvidenceStore(db).search(
+        user_id=user_id,
         analysis_id=analysis_id,
         startup_id=startup_id,
         query=q,
@@ -737,11 +824,82 @@ def search_evidence(
     response_model=EvidenceOut,
     tags=["evidence"],
 )
-def get_evidence(evidence_id: int, db: Session = Depends(get_db)):
+def get_evidence(
+    evidence_id: int,
+    db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
+):
     evidence = EvidenceStore(db).get(evidence_id)
     if evidence is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Evidence not found",
         )
+    if user_id is not None and evidence.user_id is not None and evidence.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Evidence not found",
+        )
     return evidence
+
+@api_router.get("/profile", tags=["profile"])
+def get_profile(
+    db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
+):
+    if user_id is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    profile = db.get(Profile, user_id)
+    if profile is None:
+        profile = Profile(id=user_id)
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
+    return {
+        "id": profile.id,
+        "full_name": profile.full_name,
+        "email": profile.email,
+        "avatar_url": profile.avatar_url,
+        "company": profile.company,
+        "role": profile.role,
+        "bio": profile.bio,
+        "timezone": profile.timezone,
+        "language": profile.language,
+        "preferences": profile.preferences,
+        "notifications": profile.notifications,
+        "security": profile.security,
+    }
+
+
+@api_router.put("/profile", tags=["profile"])
+def update_profile(
+    payload: dict,
+    db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
+):
+    if user_id is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    profile = db.get(Profile, user_id)
+    if profile is None:
+        profile = Profile(id=user_id)
+        db.add(profile)
+    for field in ("full_name", "email", "avatar_url", "company", "role", "bio", "timezone", "language", "preferences", "notifications", "security"):
+        if field in payload:
+            setattr(profile, field, payload[field])
+    profile.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.commit()
+    db.refresh(profile)
+    return {
+        "id": profile.id,
+        "full_name": profile.full_name,
+        "email": profile.email,
+        "avatar_url": profile.avatar_url,
+        "company": profile.company,
+        "role": profile.role,
+        "bio": profile.bio,
+        "timezone": profile.timezone,
+        "language": profile.language,
+        "preferences": profile.preferences,
+        "notifications": profile.notifications,
+        "security": profile.security,
+    }

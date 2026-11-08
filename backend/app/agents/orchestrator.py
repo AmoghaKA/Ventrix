@@ -152,6 +152,7 @@ class AgentOrchestrator:
                 analysis.startup_name,
                 analysis.website,
                 industry=analysis.industry,
+                user_id=analysis.user_id,
             )
         except ValueError as exc:
             raise InvalidAnalysisError(str(exc)) from exc

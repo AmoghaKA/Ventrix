@@ -117,6 +117,7 @@ class ControllerAgent(BaseAgent):
             analysis.startup_name,
             analysis.website,
             industry=analysis.industry,
+            user_id=analysis.user_id,
         )
         workflow.startup_id = startup.id
         self.db.flush()
