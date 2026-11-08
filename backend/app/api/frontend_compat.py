@@ -1,7 +1,10 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 
+from typing import Optional
+
 from app.core.config import settings
+from app.core.auth import get_current_user_id
 from app.db.models import Analysis, Startup
 from app.db.session import get_db
 from app.llm.gateway import llm_gateway
@@ -23,11 +26,19 @@ def health():
 
 
 @router.post("/startup", response_model=StartupOut, status_code=201)
-def create_startup(payload: StartupCreate, db: Session = Depends(get_db)):
-    existing = db.query(Startup).filter(Startup.website == str(payload.website)).first()
+def create_startup(
+    payload: StartupCreate,
+    db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
+):
+    existing = db.query(Startup).filter(Startup.website == str(payload.website))
+    if user_id is not None:
+        existing = existing.filter(Startup.user_id == user_id)
+    existing = existing.first()
     if existing is not None:
         return existing
     startup = Startup(
+        user_id=user_id,
         name=payload.name.strip(),
         description=payload.description,
         website=str(payload.website),
@@ -46,12 +57,15 @@ async def start_analysis(
     payload: AnalysisCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
 ):
-    manager = UsageLimitManager()
+    scope_id = user_id or "anonymous"
+    manager = UsageLimitManager(scope="user", scope_id=scope_id)
     if not manager.can_start_analysis(db):
         raise HTTPException(status_code=403, detail="Maximum analysis limit has been reached.")
 
     analysis = Analysis(
+        user_id=user_id,
         startup_name=payload.startup_name.strip(),
         website=str(payload.website),
         country=payload.country.strip() if payload.country else None,
@@ -87,7 +101,7 @@ async def start_analysis(
             final = db.get(DueDiligenceWorkflow, workflow_id)
             success = final is not None and final.status == WorkflowStatus.COMPLETED.value
             db.commit()
-            UsageLimitManager().complete_analysis(db, success)
+            UsageLimitManager(scope="user", scope_id=scope_id).complete_analysis(db, success)
         finally:
             db.close()
 
@@ -96,9 +110,15 @@ async def start_analysis(
 
 
 @router.get("/analysis/{analysis_id}/status")
-def analysis_status(analysis_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
+def analysis_status(
+    analysis_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
+):
     analysis = db.get(Analysis, analysis_id)
     if analysis is None:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if user_id is not None and analysis.user_id is not None and analysis.user_id != user_id:
         raise HTTPException(status_code=404, detail="Analysis not found")
     workflow = None
     try:
@@ -115,7 +135,16 @@ def analysis_status(analysis_id: int = Path(..., ge=1), db: Session = Depends(ge
 
 
 @router.get("/analysis/{analysis_id}/results")
-def analysis_results(analysis_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
+def analysis_results(
+    analysis_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
+):
+    _analysis = db.get(Analysis, analysis_id)
+    if _analysis is None:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if user_id is not None and _analysis.user_id is not None and _analysis.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Analysis not found")
     workflow = require_latest_workflow(db, analysis_id)
     rows = (
         db.query(WorkflowAgentStatus)
@@ -140,7 +169,16 @@ def analysis_results(analysis_id: int = Path(..., ge=1), db: Session = Depends(g
 
 
 @router.get("/analysis/{analysis_id}/report")
-def analysis_report(analysis_id: int = Path(..., ge=1), db: Session = Depends(get_db)):
+def analysis_report(
+    analysis_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
+):
+    _analysis = db.get(Analysis, analysis_id)
+    if _analysis is None:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if user_id is not None and _analysis.user_id is not None and _analysis.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Analysis not found")
     workflow = require_latest_workflow(db, analysis_id)
     if not workflow.report:
         raise HTTPException(status_code=404, detail="Report not available yet")
@@ -148,8 +186,14 @@ def analysis_report(analysis_id: int = Path(..., ge=1), db: Session = Depends(ge
 
 
 @router.get("/analysis/history", response_model=List[AnalysisOut])
-def analysis_history(db: Session = Depends(get_db)):
-    analyses = db.query(Analysis).order_by(Analysis.created_at.desc()).all()
+def analysis_history(
+    db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
+):
+    query = db.query(Analysis)
+    if user_id is not None:
+        query = query.filter(Analysis.user_id == user_id)
+    analyses = query.order_by(Analysis.created_at.desc()).all()
     return analyses
 
 

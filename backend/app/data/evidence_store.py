@@ -69,19 +69,20 @@ class EvidenceStore:
         website: str,
         *,
         industry: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> Startup:
         canonical = canonical_website(website)
-        startup = (
-            self.db.query(Startup)
-            .filter(Startup.website == canonical)
-            .one_or_none()
-        )
+        query = self.db.query(Startup).filter(Startup.website == canonical)
+        if user_id is not None:
+            query = query.filter(Startup.user_id == user_id)
+        startup = query.one_or_none()
 
         if startup is None:
             startup = Startup(
                 name=name.strip(),
                 website=canonical,
                 industry=industry.strip() if industry else None,
+                user_id=user_id,
             )
             self.db.add(startup)
             self.db.flush()
@@ -157,6 +158,7 @@ class EvidenceStore:
 
             if existing is None:
                 evidence = Evidence(
+                    user_id=analysis.user_id,
                     startup_id=startup.id,
                     analysis_id=analysis.id,
                     source_url=source_url,
@@ -199,6 +201,7 @@ class EvidenceStore:
     def search(
         self,
         *,
+        user_id: Optional[str] = None,
         analysis_id: Optional[int] = None,
         startup_id: Optional[int] = None,
         query: Optional[str] = None,
@@ -209,6 +212,8 @@ class EvidenceStore:
         offset: int = 0,
     ) -> SearchResult:
         filters = []
+        if user_id is not None:
+            filters.append(Evidence.user_id == user_id)
         if analysis_id is not None:
             filters.append(Evidence.analysis_id == analysis_id)
         if startup_id is not None:

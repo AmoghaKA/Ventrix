@@ -1,5 +1,16 @@
+import { supabase } from "./supabase";
+
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
+async function getAccessToken(): Promise<string | null> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export interface AnalysisSubmission {
   startup_name: string;
@@ -53,6 +64,11 @@ export async function apiRequest<T>(
 
   if (!headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
+  }
+
+  const token = await getAccessToken();
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
   }
 
   const response = await fetch(url, {
@@ -272,8 +288,12 @@ export function getReport(
 export async function downloadReportPdf(
   analysisId: string | number
 ): Promise<Blob> {
+  const token = await getAccessToken();
   const response = await fetch(
-    `${API_BASE_URL}/api/v1/analyses/${analysisId}/report/pdf`
+    `${API_BASE_URL}/api/v1/analyses/${analysisId}/report/pdf`,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }
   );
   if (!response.ok) throw new Error("Report download failed");
   return response.blob();
@@ -341,9 +361,13 @@ export interface SystemUsage {
 }
 
 export async function createStartup(input: StartupSubmission): Promise<Record<string, unknown>> {
+  const token = await getAccessToken();
   const response = await fetch(`${API_BASE_URL}/api/startup`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify(input),
   });
   if (!response.ok) throw new Error("Startup creation failed");
@@ -351,9 +375,13 @@ export async function createStartup(input: StartupSubmission): Promise<Record<st
 }
 
 export async function startAnalysis(input: AnalysisSubmission): Promise<AnalysisStartResponse> {
+  const token = await getAccessToken();
   const response = await fetch(`${API_BASE_URL}/api/analysis/start`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify(input),
   });
   if (!response.ok) {
@@ -368,7 +396,38 @@ export async function startAnalysis(input: AnalysisSubmission): Promise<Analysis
 }
 
 export async function getSystemUsage(): Promise<SystemUsage> {
-  const response = await fetch(`${API_BASE_URL}/api/system/usage`);
+  const token = await getAccessToken();
+  const response = await fetch(`${API_BASE_URL}/api/system/usage`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!response.ok) throw new Error("Failed to load usage");
   return response.json() as Promise<SystemUsage>;
+}
+
+export interface UserProfile {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  company: string | null;
+  role: string | null;
+  bio: string | null;
+  timezone: string | null;
+  language: string | null;
+  preferences: Record<string, unknown> | null;
+  notifications: Record<string, unknown> | null;
+  security: Record<string, unknown> | null;
+}
+
+export function getProfile(): Promise<UserProfile> {
+  return apiRequest<UserProfile>("/profile");
+}
+
+export function updateProfile(
+  data: Partial<Omit<UserProfile, "id">>
+): Promise<UserProfile> {
+  return apiRequest<UserProfile>("/profile", {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
 }

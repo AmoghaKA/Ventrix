@@ -21,6 +21,7 @@ class Analysis(Base):
     __tablename__ = "analyses"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String(64), nullable=True, index=True)
     startup_name = Column(String(255), nullable=False)
     website = Column(String(2048), nullable=False)
     country = Column(String(120), nullable=True)
@@ -41,6 +42,7 @@ class Startup(Base):
     __tablename__ = "startups"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String(64), nullable=True, index=True)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     website = Column(String(2048), nullable=False, unique=True, index=True)
@@ -67,6 +69,7 @@ class Evidence(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String(64), nullable=True, index=True)
     startup_id = Column(
         Integer,
         ForeignKey("startups.id"),
@@ -118,6 +121,7 @@ class DocumentExtractionFailure(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String(64), nullable=True, index=True)
     startup_id = Column(
         Integer,
         ForeignKey("startups.id"),
@@ -303,3 +307,21 @@ class UsageLimit(Base):
         UniqueConstraint("scope", "scope_id", name="uq_usage_limits_scope"),
         CheckConstraint("scope in ('global','user')", name="ck_usage_limits_scope"),
     )
+
+class Profile(Base):
+    __tablename__ = "profiles"
+
+    id = Column(String(36), primary_key=True)
+    full_name = Column(String(255), nullable=True)
+    email = Column(String(255), nullable=True)
+    avatar_url = Column(Text, nullable=True)
+    company = Column(String(255), nullable=True)
+    role = Column(String(255), nullable=True)
+    bio = Column(Text, nullable=True)
+    timezone = Column(String(64), nullable=True)
+    language = Column(String(16), nullable=True)
+    preferences = Column(JSON, nullable=True)
+    notifications = Column(JSON, nullable=True)
+    security = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at = Column(DateTime, nullable=True)
