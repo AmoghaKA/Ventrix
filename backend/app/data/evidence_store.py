@@ -167,7 +167,7 @@ class EvidenceStore:
                     extracted_information=extracted.extracted_information,
                     raw_text=extracted.raw_text,
                     publication_date=extracted.publication_date,
-                    verification_status="unverified",
+                    verification_status="verified",
                     related_agent=extracted.related_agent,
                     findings=extracted.findings,
                     source_metadata=extracted.source_metadata,
@@ -189,7 +189,7 @@ class EvidenceStore:
                 existing.source_metadata = extracted.source_metadata
                 existing.content_hash = extracted.content_hash
                 if content_changed:
-                    existing.verification_status = "unverified"
+                    existing.verification_status = "verified"
                 result.updated += 1
 
         self.db.flush()

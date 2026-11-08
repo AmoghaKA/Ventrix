@@ -35,11 +35,17 @@ def _mock_object(schema: type[BaseModel]) -> dict:
     result = {}
     for name, field in schema.model_fields.items():
         if field.default is not PydanticUndefined:
-            result[name] = field.default
+            value = field.default
+            if isinstance(value, BaseModel):
+                value = value.model_dump()
+            result[name] = value
             continue
         if field.default_factory is not None:
             try:
-                result[name] = field.default_factory()
+                value = field.default_factory()
+                if isinstance(value, BaseModel):
+                    value = value.model_dump()
+                result[name] = value
                 continue
             except Exception:
                 pass

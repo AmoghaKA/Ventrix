@@ -2,25 +2,30 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  AlertCircle,
   AlertTriangle,
   ArrowUpRight,
   BarChart3,
   CalendarDays,
+  CheckCircle2,
   ChevronDown,
   Compass,
   Download,
   FileText,
   Gauge,
+  HelpCircle,
   Layers3,
   Link2,
   ListChecks,
   Loader2,
+  PauseCircle,
   Search,
   SearchX,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
   TrendingUp,
+  XCircle,
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -101,6 +106,16 @@ function verificationTone(value: unknown): Tone {
   return "neutral";
 }
 
+function isVerified(value: unknown): boolean {
+  const normalized = text(value).toLowerCase();
+  return (
+    normalized === "verified" ||
+    (normalized.includes("verified") &&
+      !normalized.includes("un") &&
+      !normalized.includes("partial"))
+  );
+}
+
 function assessmentTone(value: unknown): Tone {
   const normalized = text(value).toLowerCase();
   if (normalized.includes("do not") || normalized.includes("reject")) return "critical";
@@ -113,6 +128,47 @@ function assessmentTone(value: unknown): Tone {
   }
   if (normalized.includes("proceed")) return "success";
   return "neutral";
+}
+
+function decisionMessage(report: Report): string {
+  const risk = (humanize(report.overall_risk) || "unknown").toLowerCase();
+  const verification = (humanize(report.verification_status) || "unavailable").toLowerCase();
+  const concerns = asArray(report.major_concerns).length;
+  const gaps = asArray(report.missing_information).length;
+  const failed = asArray(report.failed_agents).length;
+  const parts = [
+    `Overall risk is ${risk} and evidence verification is ${verification}.`,
+    concerns > 0
+      ? `${concerns} major concern${concerns === 1 ? "" : "s"} flagged.`
+      : "No major concerns flagged.",
+    gaps > 0
+      ? `${gaps} information gap${gaps === 1 ? "" : "s"} remain open.`
+      : "No open information gaps.",
+    failed > 0
+      ? `${failed} specialist agent${failed === 1 ? "" : "s"} did not complete.`
+      : "",
+  ].filter(Boolean);
+  return parts.join(" ");
+}
+function investmentVerdict(category: unknown): {
+  label: string;
+  tone: Tone;
+  Icon: typeof CheckCircle2;
+} {
+  const normalized = text(category).toLowerCase();
+  if (normalized.includes("do not") || normalized.includes("reject")) {
+    return { label: "Do Not Invest", tone: "critical", Icon: XCircle };
+  }
+  if (normalized.includes("hold") || normalized.includes("investigation")) {
+    return { label: "Hold — Investigate Further", tone: "warning", Icon: PauseCircle };
+  }
+  if (normalized.includes("conditional")) {
+    return { label: "Proceed Conditionally", tone: "warning", Icon: AlertCircle };
+  }
+  if (normalized.includes("proceed")) {
+    return { label: "Consider Investing", tone: "success", Icon: CheckCircle2 };
+  }
+  return { label: text(category) || "Undecided", tone: "neutral", Icon: HelpCircle };
 }
 
 function humanize(value: unknown): string {
@@ -230,10 +286,10 @@ function HeroPill({
   children: React.ReactNode;
 }) {
   const styles: Record<Tone, string> = {
-    success: "bg-emerald-400/10 text-emerald-300 ring-emerald-400/25",
-    warning: "bg-amber-400/10 text-amber-300 ring-amber-400/25",
-    critical: "bg-rose-400/10 text-rose-300 ring-rose-400/25",
-    neutral: "bg-white/10 text-slate-200 ring-white/15",
+    success: "bg-emerald-50 text-emerald-700 ring-emerald-200/70",
+    warning: "bg-amber-50 text-amber-700 ring-amber-200/70",
+    critical: "bg-rose-50 text-rose-700 ring-rose-200/70",
+    neutral: "bg-slate-100 text-slate-600 ring-slate-200/70",
   };
 
   return (
@@ -242,7 +298,7 @@ function HeroPill({
     >
       <span
         className={`h-1.5 w-1.5 rounded-full ${
-          tone === "neutral" ? "bg-slate-300" : toneStyles[tone].dot
+          tone === "neutral" ? "bg-slate-400" : toneStyles[tone].dot
         }`}
       />
       {children}
@@ -262,18 +318,18 @@ function HeroStat({
   tone: Tone;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4 backdrop-blur-sm transition-colors duration-300 hover:bg-white/[0.08]">
+    <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm transition-colors duration-300 hover:shadow-ring">
       <div className="flex items-center gap-2">
         <span className={`h-1.5 w-1.5 rounded-full ${toneStyles[tone].dot}`} />
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
           {label}
         </p>
       </div>
-      <p className="mt-2 text-lg font-semibold tracking-tight text-white">
+      <p className="mt-2 text-lg font-semibold tracking-tight text-slate-900">
         {value}
       </p>
       {detail ? (
-        <p className="mt-1 text-[11px] leading-relaxed text-slate-400">{detail}</p>
+        <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{detail}</p>
       ) : null}
     </div>
   );
@@ -325,7 +381,9 @@ function SectionCard({ section }: { section: Record<string, unknown> }) {
   const sectionCharts = asArray(section.charts) as Record<string, unknown>[];
   const sectionTables = asArray(section.tables) as Record<string, unknown>[];
   const indicators = asArray(section.risk_indicators) as Record<string, unknown>[];
-  const references = asArray(section.evidence_references) as Record<string, unknown>[];
+  const references = (asArray(section.evidence_references) as Record<string, unknown>[]).filter(
+    (reference) => isVerified(reference.verification_status)
+  );
   const { Icon, tile } = sectionVisual(title);
 
   return (
@@ -594,9 +652,13 @@ export default function InvestorReportsPage() {
 
   const sections = asArray(report?.sections) as Record<string, unknown>[];
   const charts = asArray(report?.charts) as Record<string, unknown>[];
-  const evidenceReferences = asArray(report?.evidence_references) as Record<string, unknown>[];
+  const evidenceReferences = (asArray(report?.evidence_references) as Record<string, unknown>[]).filter((reference) =>
+    isVerified(reference.verification_status)
+  );
   const questions = asArray(report?.investor_questions).map(text);
-  const reliability = asArray(report?.source_reliability) as Record<string, unknown>[];
+  const reliability = (asArray(report?.source_reliability) as Record<string, unknown>[]).filter((item) =>
+    isVerified(item.verification_status)
+  );
   const contradictions = asArray(report?.contradictions) as Record<string, unknown>[];
 
   const rawAssessment = (report?.controller_assessment ??
@@ -817,10 +879,10 @@ export default function InvestorReportsPage() {
 
       {report && (
         <>
-          <section className="relative overflow-hidden rounded-3xl bg-[linear-gradient(135deg,#0f172a_0%,#111c34_45%,#1e1b4b_100%)] px-6 py-7 text-white shadow-lift ring-1 ring-white/10 sm:px-8 sm:py-8">
-            <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl" />
-            <div className="pointer-events-none absolute -bottom-32 left-1/3 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl" />
-            <div className="pointer-events-none absolute inset-0 bg-grid opacity-[0.06]" />
+          <section className="relative overflow-hidden rounded-3xl border border-slate-200/70 bg-gradient-to-br from-white via-blue-50/40 to-indigo-50/40 px-6 py-7 shadow-soft sm:px-8 sm:py-8">
+            <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-blue-200/40 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-32 left-1/3 h-64 w-64 rounded-full bg-indigo-200/30 blur-3xl" />
+            <div className="pointer-events-none absolute inset-0 bg-grid opacity-[0.4]" />
 
             <div className="relative">
               <div className="flex flex-wrap items-center gap-2">
@@ -837,22 +899,22 @@ export default function InvestorReportsPage() {
 
               <div className="mt-5 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                 <div className="max-w-3xl">
-                  <h2 className="text-balance text-2xl font-bold tracking-[-0.03em] text-white sm:text-[30px] sm:leading-tight">
+                  <h2 className="text-balance text-2xl font-bold tracking-[-0.03em] text-slate-900 sm:text-[30px] sm:leading-tight">
                     {text(report.title) || "Investor Due Diligence Report"}
                   </h2>
-                  <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300">
+                  <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-600">
                     {text(report.executive_summary)}
                   </p>
                 </div>
 
-                <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                <div className="w-full max-w-sm rounded-2xl border border-slate-200/70 bg-white/85 p-4 shadow-sm backdrop-blur-sm">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                     Recommendation
                   </p>
-                  <p className="mt-1.5 text-sm font-medium leading-relaxed text-white">
+                  <p className="mt-1.5 text-sm font-medium leading-relaxed text-slate-800">
                     {text(report.recommendation) || "Review the report before deciding."}
                   </p>
-                  <div className="mt-4 flex items-center gap-2 border-t border-white/10 pt-3 text-[11px] text-slate-400">
+                  <div className="mt-4 flex items-center gap-2 border-t border-slate-200/70 pt-3 text-[11px] text-slate-500">
                     <CalendarDays className="h-3.5 w-3.5" />
                     Generated {formatDate(report.generated_at)}
                   </div>
@@ -887,6 +949,77 @@ export default function InvestorReportsPage() {
               </div>
             </div>
           </section>
+
+          {(() => {
+            const verdict = investmentVerdict(report.final_assessment_category);
+            const Icon = verdict.Icon;
+            const topRisks = asArray(report.major_concerns)
+              .map(text)
+              .filter(Boolean)
+              .slice(0, 4);
+            return (
+              <div
+                className={`relative overflow-hidden rounded-3xl border p-7 shadow-lift animate-fade-up ${toneStyles[verdict.tone].soft}`}
+              >
+                <div
+                  className={`pointer-events-none absolute inset-x-0 top-0 h-1.5 ${toneStyles[verdict.tone].bar}`}
+                />
+                <div className="pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full bg-white/50 blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-16 left-1/4 h-40 w-40 rounded-full bg-white/40 blur-3xl" />
+                <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start">
+                  <span
+                    className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-white shadow-md ring-1 ring-inset ${toneStyles[verdict.tone].ring} ${toneStyles[verdict.tone].text}`}
+                  >
+                    <Icon className="h-8 w-8" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Investment decision
+                      </p>
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ring-1 ring-inset ${toneStyles[verdict.tone].soft} ${toneStyles[verdict.tone].text}`}
+                      >
+                        <span className={`h-1.5 w-1.5 rounded-full ${toneStyles[verdict.tone].dot}`} />
+                        Verdict
+                      </span>
+                    </div>
+                    <h3
+                      className={`mt-1.5 text-3xl font-extrabold tracking-tight ${toneStyles[verdict.tone].text}`}
+                    >
+                      {verdict.label}
+                    </h3>
+                    <p className="mt-3 text-sm leading-relaxed text-slate-700">
+                      {decisionMessage(report)}
+                    </p>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                      {text(report.recommendation)}
+                    </p>
+                    {topRisks.length > 0 && (
+                      <div className="mt-5">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Key considerations
+                        </p>
+                        <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {topRisks.map((risk, index) => (
+                            <li
+                              key={index}
+                              className="flex items-start gap-2.5 rounded-2xl bg-white/85 px-3.5 py-2.5 text-xs leading-relaxed text-slate-700 shadow-sm transition-shadow hover:shadow-ring"
+                            >
+                              <span
+                                className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${toneStyles[verdict.tone].dot}`}
+                              />
+                              <span>{risk}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-slate-200/70 bg-white/80 p-1.5 shadow-sm backdrop-blur-sm">
             {tabs.map(({ key, label, Icon }) => (
