@@ -13,6 +13,45 @@ import {
   type WorkflowAgentStatusRecord,
 } from "@/lib/api";
 
+function humanize(value: unknown): string {
+  if (value == null) return "";
+  const raw = String(value).replace(/_/g, " ").trim();
+  if (!raw) return "";
+  return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+}
+
+function describeReference(reference: unknown): string {
+  if (reference == null) return "";
+  if (typeof reference === "string" || typeof reference === "number") {
+    return String(reference);
+  }
+  if (typeof reference === "object") {
+    const record = reference as Record<string, unknown>;
+    const id = record.evidence_id ?? record.id;
+    const title = record.source_title ?? record.title;
+    if (title && id) return `${String(title)} (${String(id)})`;
+    if (title) return String(title);
+    if (id) return `Evidence ${String(id)}`;
+  }
+  return "Unavailable";
+}
+
+function describeMissing(item: unknown): string {
+  if (item == null) return "";
+  if (typeof item === "string" || typeof item === "number") return String(item);
+  if (typeof item === "object") {
+    const record = item as Record<string, unknown>;
+    return String(
+      record.description ??
+        record.label ??
+        record.item ??
+        record.dimension ??
+        JSON.stringify(record)
+    );
+  }
+  return String(item);
+}
+
 const tabs = [
   { key: "financial", label: "Financial Agent" },
   { key: "marketing", label: "Marketing Agent" },
@@ -119,7 +158,7 @@ function AgentTabsInner() {
                 {tabs.find((tab) => tab.key === active)?.label}
               </h2>
               <p className="mt-1 text-xs text-text-secondary">
-                Status: {selected?.status ?? "Not available"} · Attempts:{" "}
+                Status: {humanize(selected?.status) || "Not available"} · Attempts:{" "}
                 {selected?.attempt_count ?? 0}
               </p>
             </div>
@@ -148,19 +187,19 @@ function AgentTabsInner() {
                 <div className="rounded-sm border border-border bg-secondary/30 p-3">
                   <p className="text-[10px] uppercase tracking-wider text-text-secondary">Risk level</p>
                   <p className="mt-1 text-sm font-semibold text-text-primary">
-                    {String(output.risk_level ?? "Unknown")}
+                    {humanize(output.risk_level) || "Unknown"}
                   </p>
                 </div>
                 <div className="rounded-sm border border-border bg-secondary/30 p-3">
                   <p className="text-[10px] uppercase tracking-wider text-text-secondary">Evidence status</p>
                   <p className="mt-1 text-sm font-semibold text-text-primary">
-                    {String(output.evidence_status ?? "Unavailable")}
+                    {humanize(output.evidence_status) || "Unavailable"}
                   </p>
                 </div>
                 <div className="rounded-sm border border-border bg-secondary/30 p-3">
                   <p className="text-[10px] uppercase tracking-wider text-text-secondary">Execution</p>
                   <p className="mt-1 text-sm font-semibold text-text-primary">
-                    {String(output.execution_status ?? "Unknown")}
+                    {humanize(output.execution_status) || "Unknown"}
                   </p>
                 </div>
               </div>
@@ -176,19 +215,25 @@ function AgentTabsInner() {
                     className="rounded-sm border border-border bg-white p-4"
                   >
                     <summary className="cursor-pointer text-sm font-semibold text-text-primary">
-                      {String(finding.dimension ?? "Finding")} - {String(finding.risk_level ?? "Unknown")}
+                      {String(finding.dimension ?? "Finding")} -{" "}
+                      {humanize(finding.risk_level) || "Unknown"}
                     </summary>
                     <div className="mt-3 space-y-2 text-xs text-text-secondary">
                       <p>{String(finding.summary ?? "")}</p>
                       <p>{String(finding.explanation ?? "")}</p>
                       <p>
-                        Evidence status: {String(finding.evidence_status ?? "Unavailable")}
+                        Evidence status:{" "}
+                        {humanize(finding.evidence_status) || "Unavailable"}
                       </p>
                       <p>Investor impact: {String(finding.investor_impact ?? "Not provided")}</p>
                       <p>
                         Source references:{" "}
-                        {Array.isArray(finding.evidence_references)
-                          ? finding.evidence_references.join(", ")
+                        {Array.isArray(finding.evidence_references) &&
+                        finding.evidence_references.length > 0
+                          ? finding.evidence_references
+                              .map(describeReference)
+                              .filter(Boolean)
+                              .join(", ")
                           : "None"}
                       </p>
                     </div>
@@ -203,7 +248,7 @@ function AgentTabsInner() {
                   </h3>
                   <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-text-secondary">
                     {output.missing_information.map((item, index) => (
-                      <li key={index}>{String(item)}</li>
+                      <li key={index}>{describeMissing(item)}</li>
                     ))}
                   </ul>
                 </div>
