@@ -124,6 +124,15 @@ export async function apiRequest<T>(
     throw new Error(message);
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    return undefined as T;
+  }
+
   return response.json() as Promise<T>;
 }
 
@@ -137,6 +146,10 @@ export function createAnalysis(
     invalidateAnalysesCache();
     return result;
   });
+}
+
+export function deleteAnalysis(analysisId: string | number): Promise<void> {
+  return apiRequest<void>(`/analyses/${analysisId}`, { method: "DELETE" });
 }
 
 export function getAnalysis(
