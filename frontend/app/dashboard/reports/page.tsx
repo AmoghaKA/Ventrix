@@ -24,6 +24,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
+  Trash2,
   TrendingUp,
   XCircle,
 } from "lucide-react";
@@ -33,7 +34,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   downloadReportPdf,
+  deleteAnalysis,
   getReport,
+  invalidateAnalysesCache,
   listAnalyses,
   type AnalysisRecord,
 } from "@/lib/api";
@@ -562,6 +565,7 @@ export default function InvestorReportsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const requestRef = useRef(0);
 
   useEffect(() => {
@@ -646,6 +650,30 @@ export default function InvestorReportsPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!analysisId) return;
+    if (!window.confirm("Delete this investor report and its analysis? This cannot be undone.")) {
+      return;
+    }
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteAnalysis(analysisId);
+      invalidateAnalysesCache();
+      const remaining = analyses.filter((item) => String(item.id) !== String(analysisId));
+      setAnalyses(remaining);
+      setReport(null);
+      const nextId = remaining.length > 0 ? String(remaining[0].id) : "";
+      setAnalysisId(nextId);
+      if (nextId) {
+        void loadReportById(nextId);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete report");
+    } finally {
+      setDeleting(false);
+    }
+  };
   const [activeTab, setActiveTab] = useState<
     "overview" | "findings" | "verification" | "gaps"
   >("overview");
@@ -813,6 +841,20 @@ export default function InvestorReportsPage() {
                 <Download className="mr-2 h-4 w-4" />
               )}
               {downloading ? "Exporting…" : "Export PDF"}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleDelete}
+              disabled={deleting || !analysisId}
+              className="border-rose-200 text-rose-600 hover:bg-rose-50"
+            >
+              {deleting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              {deleting ? "Deleting…" : "Delete"}
             </Button>
           </div>
         </div>

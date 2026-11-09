@@ -4,6 +4,7 @@ from typing import List, Optional
 from urllib.parse import urlsplit, urlunsplit
 
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.data.extraction import (
@@ -72,10 +73,12 @@ class EvidenceStore:
         user_id: Optional[str] = None,
     ) -> Startup:
         canonical = canonical_website(website)
-        query = self.db.query(Startup).filter(Startup.website == canonical)
-        if user_id is not None:
-            query = query.filter(Startup.user_id == user_id)
-        startup = query.one_or_none()
+        # Website is globally unique, so look it up without scoping by user first.
+        startup = (
+            self.db.query(Startup)
+            .filter(Startup.website == canonical)
+            .one_or_none()
+        )
 
         if startup is None:
             startup = Startup(
@@ -85,11 +88,26 @@ class EvidenceStore:
                 user_id=user_id,
             )
             self.db.add(startup)
-            self.db.flush()
+            try:
+                self.db.flush()
+            except IntegrityError:
+                # Another transaction may have created it concurrently; reuse it.
+                self.db.rollback()
+                startup = (
+                    self.db.query(Startup)
+                    .filter(Startup.website == canonical)
+                    .one_or_none()
+                )
+                if startup is None:
+                    raise
             return startup
 
         if industry and not startup.industry:
             startup.industry = industry.strip()
+            self.db.flush()
+
+        if user_id is not None and startup.user_id is None:
+            startup.user_id = user_id
             self.db.flush()
 
         return startup

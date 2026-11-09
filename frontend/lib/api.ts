@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 
 let analysesCache: { data: AnalysisRecord[]; fetchedAt: number } | null = null;
 let analysesPromise: Promise<AnalysisRecord[]> | null = null;
@@ -124,6 +124,15 @@ export async function apiRequest<T>(
     throw new Error(message);
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    return undefined as T;
+  }
+
   return response.json() as Promise<T>;
 }
 
@@ -137,6 +146,10 @@ export function createAnalysis(
     invalidateAnalysesCache();
     return result;
   });
+}
+
+export function deleteAnalysis(analysisId: string | number): Promise<void> {
+  return apiRequest<void>(`/analyses/${analysisId}`, { method: "DELETE" });
 }
 
 export function getAnalysis(

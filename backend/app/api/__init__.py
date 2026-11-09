@@ -135,13 +135,77 @@ def list_analyses(
     return query.order_by(Analysis.created_at.desc()).all()
 
 
+@api_router.delete(
+    "/analyses/{analysis_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["analyses"],
+)
+def delete_analysis(
+    analysis_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_current_user_id),
+):
+    analysis = db.get(Analysis, analysis_id)
+    if analysis is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Analysis {analysis_id} was not found.",
+        )
+    if user_id is not None and analysis.user_id is not None and analysis.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Analysis {analysis_id} was not found.",
+        )
+
+    # Remove dependent rows first to satisfy foreign-key constraints.
+    from app.db.models import (
+        DocumentExtractionFailure,
+        DueDiligenceWorkflow,
+        Evidence,
+        WorkflowActivityLog,
+        WorkflowAgentStatus,
+        WorkflowCheckpoint,
+    )
+
+    workflow_ids = [
+        row.id
+        for row in db.query(DueDiligenceWorkflow.id).filter(
+            DueDiligenceWorkflow.analysis_id == analysis_id
+        )
+    ]
+    if workflow_ids:
+        db.query(WorkflowAgentStatus).filter(
+            WorkflowAgentStatus.workflow_id.in_(workflow_ids)
+        ).delete(synchronize_session=False)
+        db.query(WorkflowActivityLog).filter(
+            WorkflowActivityLog.workflow_id.in_(workflow_ids)
+        ).delete(synchronize_session=False)
+        db.query(WorkflowCheckpoint).filter(
+            WorkflowCheckpoint.workflow_id.in_(workflow_ids)
+        ).delete(synchronize_session=False)
+        db.query(DueDiligenceWorkflow).filter(
+            DueDiligenceWorkflow.id.in_(workflow_ids)
+        ).delete(synchronize_session=False)
+
+    db.query(Evidence).filter(Evidence.analysis_id == analysis_id).delete(
+        synchronize_session=False
+    )
+    db.query(DocumentExtractionFailure).filter(
+        DocumentExtractionFailure.analysis_id == analysis_id
+    ).delete(synchronize_session=False)
+
+    db.delete(analysis)
+    db.commit()
+    return None
+
+
 @api_router.get(
     "/analyses/{analysis_id}",
     response_model=AnalysisOut,
     tags=["analyses"],
 )
 def get_analysis(
-    analysis_id: int,
+    analysis_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
     user_id: Optional[str] = Depends(get_current_user_id),
 ):

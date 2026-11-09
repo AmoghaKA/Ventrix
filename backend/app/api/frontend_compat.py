@@ -89,21 +89,32 @@ async def start_analysis(
         raise
 
     async def _run_and_finalize(workflow_id: int):
-        await run_workflow_background(
-            workflow_id,
-            retry_limit=settings.WORKFLOW_MAX_RETRIES,
-            max_pages=settings.WORKFLOW_MAX_PAGES,
-        )
-        db = SessionLocal()
+        success = False
         try:
-            from app.db.models import DueDiligenceWorkflow
+            await run_workflow_background(
+                workflow_id,
+                retry_limit=settings.WORKFLOW_MAX_RETRIES,
+                max_pages=settings.WORKFLOW_MAX_PAGES,
+            )
+            db = SessionLocal()
+            try:
+                from app.db.models import DueDiligenceWorkflow
 
-            final = db.get(DueDiligenceWorkflow, workflow_id)
-            success = final is not None and final.status == WorkflowStatus.COMPLETED.value
-            db.commit()
-            UsageLimitManager(scope="user", scope_id=scope_id).complete_analysis(db, success)
+                final = db.get(DueDiligenceWorkflow, workflow_id)
+                success = final is not None and final.status == WorkflowStatus.COMPLETED.value
+                db.commit()
+            finally:
+                db.close()
+        except Exception:
+            success = False
         finally:
-            db.close()
+            db = SessionLocal()
+            try:
+                UsageLimitManager(scope="user", scope_id=scope_id).complete_analysis(
+                    db, success
+                )
+            finally:
+                db.close()
 
     background_tasks.add_task(_run_and_finalize, workflow.id)
     return {"analysis_id": analysis.id, "status": "started"}
