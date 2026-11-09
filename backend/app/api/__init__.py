@@ -197,8 +197,15 @@ def delete_analysis(
     db.delete(analysis)
     db.commit()
     return None
+
+
+@api_router.get(
+    "/analyses/{analysis_id}",
+    response_model=AnalysisOut,
+    tags=["analyses"],
+)
 def get_analysis(
-    analysis_id: int,
+    analysis_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
     user_id: Optional[str] = Depends(get_current_user_id),
 ):

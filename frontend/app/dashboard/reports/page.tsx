@@ -843,6 +843,7 @@ export default function InvestorReportsPage() {
               {downloading ? "Exporting…" : "Export PDF"}
             </Button>
             <Button
+              type="button"
               variant="secondary"
               onClick={handleDelete}
               disabled={deleting || !analysisId}
